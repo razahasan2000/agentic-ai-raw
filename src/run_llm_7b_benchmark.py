@@ -1,17 +1,38 @@
 #!/usr/bin/env python3
 """
-Run 7B LLM Benchmark on seed 3 (86 high-risk patients)
-4-bit quantized Qwen2.5-7B-Instruct on RTX 4070 (8.6 GB VRAM)
+7B LLM Benchmark - 4-bit NF4, GPU-0 only, resumable
+===================================================
+Evaluates Qwen2.5-7B-Instruct on the same seed-3 / 86 high-risk patients and
+the same four variants, prompts, verifier and token budgets as the 1.5B run
+(run_llm_eval_fixed.py), so Table 8 is apples-to-apples.
+
+Memory design (the original OOM fix):
+  * genuine 4-bit NF4 weights with double quantisation  (~4.5-6.5 GB, not 15.2 GB fp16)
+  * device_map pinned to GPU 0, never "auto"           (no silent CPU offload)
+  * SDPA attention + use_cache=True                     (KV cache, no eager attention)
+  * one sequence at a time; OOM retry clears cache, then halves the token
+    budget *transparently* (recorded as oom_retries / reduced max_new_tokens)
+
+Durability:
+  * every trace is appended + fsync'd immediately
+  * a torn final line from a kill is repaired on the next start
+  * completed (patient, variant) pairs are skipped; duplicates are removed
+  * metrics are written atomically via a .tmp + os.replace
 """
 
-import os
+import argparse
 import json
+import os
+import sys
+import time
 import warnings
+from datetime import datetime
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import torch
-from pathlib import Path
-from datetime import datetime
+
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
@@ -21,15 +42,47 @@ from sklearn.covariance import LedoitWolf
 from scipy.stats import norm, gaussian_kde
 from scipy.special import expit, logit
 from transformers import AutoModelForCausalLM, AutoTokenizer
-import time
 
 warnings.filterwarnings('ignore')
 
-# Paths
-ROOT = Path(__file__).parent.parent
-RESULTS_DIR = ROOT / "results"
-RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+ROOT = Path(__file__).resolve().parent.parent
 
+
+def parse_args(argv=None):
+    p = argparse.ArgumentParser(
+        description="4-bit Qwen2.5-7B agentic benchmark (resumable).",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
+    p.add_argument("--limit", type=int, default=0,
+                   help="Evaluate only the first N high-risk patients (0 = all 86).")
+    p.add_argument("--max-attempts", type=int, default=3,
+                   help="Verifier repair attempts for full_agentic (3 = full protocol).")
+    p.add_argument("--variants", default="unconstrained,schema_prompted,loop1_schema,full_agentic",
+                   help="Comma-separated subset of variants.")
+    p.add_argument("--traces-file", default="results/llm_traces_7b.jsonl")
+    p.add_argument("--metrics-file", default="results/metrics_verified.json")
+    p.add_argument("--mock", action="store_true",
+                   help="Run the pipeline with a deterministic stub model (no GPU).")
+    p.add_argument("--no-resume", action="store_true",
+                   help="Ignore an existing traces file and start from scratch.")
+    p.add_argument("--seed", type=int, default=3)
+    args = p.parse_args(argv)
+
+    if args.seed != 3:
+        p.error("this benchmark is pinned to seed 3 to match the 1.5B evaluation")
+    if args.limit < 0:
+        p.error("--limit must be >= 0")
+    if args.max_attempts < 1:
+        p.error("--max-attempts must be >= 1")
+    return args
+
+
+args = parse_args()
+
+# ------------------------------------------------------------------
+# Original data / model / conformal setup (unchanged from the 1.5B run)
+# ------------------------------------------------------------------
 # Load data
 print("[Loading Data]")
 cohort = pd.read_csv(ROOT / "data" / "nhanes_diabetes_cohort.csv")
@@ -378,231 +431,568 @@ high_risk_idx = np.where(p_test_cal > 0.5)[0]
 print(f"High-risk patients for 7B LLM eval: {len(high_risk_idx)}")
 
 # ============================================================
-# LOAD 7B MODEL
+# EXPERIMENT CONFIGURATION
 # ============================================================
-print("\n[Loading 7B Model]")
-model_name = "Qwen/Qwen2.5-7B-Instruct"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(
-    model_name, 
-    dtype=torch.float16, 
-    device_map="auto", 
-    low_cpu_mem_usage=True
-)
-print(f"Loaded {model_name}")
+VARIANT_ORDER = ['unconstrained', 'schema_prompted', 'loop1_schema', 'full_agentic']
+TOKEN_BUDGETS = {
+    'unconstrained': 100,
+    'schema_prompted': 150,
+    'loop1_schema': 150,
+    'full_agentic': 150,
+}
 
-# Memory check
-if torch.cuda.is_available():
-    allocated = torch.cuda.memory_allocated() / 1e9
-    reserved = torch.cuda.memory_reserved() / 1e9
-    print(f"GPU Memory: Allocated={allocated:.2f} GB, Reserved={reserved:.2f} GB")
-
-# ============================================================
-# VERIFIER CHECKS
-# ============================================================
 def verifier_check(response, evidence):
+    """Verifier identical to run_llm_eval_fixed.py (1.5B run)."""
     checks = {}
     risk_str = f"{evidence['risk']}"
     checks['risk_match'] = risk_str in response or f"{evidence['risk']:.1f}" in response
     checks['coverage_stated'] = '90%' in response or '90 percent' in response.lower()
     checks['subgroup_stated'] = evidence['subgroup'] in response
-    checks['no_forbidden'] = 'HbA1c' not in response and 'medication' not in response.lower() and 'medicine' not in response.lower()
-    checks['counterfactual_match'] = True  # Simplified
+    checks['no_forbidden'] = ('HbA1c' not in response
+                              and 'medication' not in response.lower()
+                              and 'medicine' not in response.lower())
+    checks['counterfactual_match'] = True  # simplified, same as 1.5B run
     return checks
 
-# ============================================================
-# RUN EVALUATION
-# ============================================================
-print(f"\n[Running 7B LLM Evaluation on {len(high_risk_idx)} patients]")
 
-llm_traces = []
-model_results = {}
-for variant in ['unconstrained', 'schema_prompted', 'loop1_schema', 'full_agentic']:
-    model_results[variant] = {'passes': [], 'latencies': [], 'traces': []}
+SELECTED_VARIANTS = [v.strip() for v in args.variants.split(',') if v.strip()]
+for _v in SELECTED_VARIANTS:
+    if _v not in VARIANT_ORDER:
+        raise SystemExit(f"Unknown variant '{_v}'. Choose from {VARIANT_ORDER}")
 
-for local_idx in high_risk_idx:
-    z = X_test[local_idx]
-    sg = sg_test[local_idx]
-    p = p_test_cal[local_idx]
-    
-    # Counterfactual
-    delta, mahal, inside, p_final, tier_used, radius_mult, feasible = solve_with_recovery(
-        z, sg, 0.5, w_cal, b_cal, subgroup_stats)
-    
-    cf_changes = {z_cols[i]: round(delta[i], 2) for i in range(len(delta)) if abs(delta[i]) > 1e-3}
-    
-    evidence = {
-        'patient_id': int(sid_test[local_idx]),
-        'subgroup': sg,
-        'risk': round(p * 100, 1),
-        'prediction_set': [1, 0],
-        'coverage': '90%',
-        'counterfactual': {
-            'tier': tier_used,
-            'radius_mult': radius_mult,
-            'changes': cf_changes,
-            'inside_ellipsoid': inside
-        },
-        'subgroup_coverage': round(val_cov_per_sg.get(sg, 0) * 100, 1),
-        'ece': round(ece * 100, 1)
+TRACES_PATH = Path(args.traces_file)
+METRICS_PATH = Path(args.metrics_file)
+if not TRACES_PATH.is_absolute():
+    TRACES_PATH = ROOT / TRACES_PATH
+if not METRICS_PATH.is_absolute():
+    METRICS_PATH = ROOT / METRICS_PATH
+TRACES_PATH.parent.mkdir(parents=True, exist_ok=True)
+METRICS_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+MODEL_LABEL = "MOCK-Qwen2.5-7B-Instruct" if args.mock else args.model
+QUANT_LABEL = "none (mock)" if args.mock else "4-bit NF4, double-quant, fp16 compute"
+
+if args.limit and args.limit > 0:
+    eval_idx = high_risk_idx[:args.limit]
+else:
+    eval_idx = high_risk_idx
+
+print(f"[Scope] patients={len(eval_idx)}/{len(high_risk_idx)} variants={SELECTED_VARIANTS} "
+      f"max_attempts={args.max_attempts} mock={args.mock}")
+
+
+def log(msg):
+    print(msg, flush=True)
+
+
+def atomic_write_json(path, obj):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=2, default=str)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def vram_stats():
+    if not torch.cuda.is_available():
+        return {}
+    free, total = torch.cuda.mem_get_info()
+    return {
+        "allocated_GB": round(torch.cuda.memory_allocated() / 1e9, 3),
+        "reserved_GB": round(torch.cuda.memory_reserved() / 1e9, 3),
+        "peak_allocated_GB": round(torch.cuda.max_memory_allocated() / 1e9, 3),
+        "free_GB": round(free / 1e9, 3),
+        "total_GB": round(total / 1e9, 3),
     }
-    
-    # (a) Unconstrained LLM
-    prompt_unconstrained = f"Patient has {p*100:.1f}% diabetes risk. Explain what lifestyle changes would reduce risk to <= 50%."
-    inputs = tokenizer(f"User: {prompt_unconstrained}\nAssistant:", return_tensors="pt").to("cuda")
-    start = time.time()
-    with torch.no_grad():
-        out = model.generate(**inputs, max_new_tokens=150, do_sample=False, pad_token_id=tokenizer.eos_token_id)
-    latency = time.time() - start
-    response = tokenizer.decode(out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
-    
-    checks = verifier_check(response, evidence)
-    passed = all(checks.values())
-    
-    model_results['unconstrained']['passes'].append(passed)
-    model_results['unconstrained']['latencies'].append(latency)
-    trace = {
-        'patient': int(sid_test[local_idx]),
-        'subgroup': sg,
-        'risk': evidence['risk'],
-        'prompt': prompt_unconstrained,
-        'response': response,
-        'checks': checks,
-        'passed': passed
-    }
-    model_results['unconstrained']['traces'].append(trace)
-    llm_traces.append({'model': 'Qwen2.5-7B-Instruct', 'variant': 'unconstrained', **trace})
-    
-    # (b) Schema Prompted (1-shot)
-    schema_prompt = f"Evidence: {json.dumps(evidence)}. Generate patient-friendly explanation."
-    inputs = tokenizer(f"User: {schema_prompt}\nAssistant:", return_tensors="pt").to("cuda")
-    start = time.time()
-    with torch.no_grad():
-        out = model.generate(**inputs, max_new_tokens=200, do_sample=False, pad_token_id=tokenizer.eos_token_id)
-    latency = time.time() - start
-    response = tokenizer.decode(out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
-    
-    checks = verifier_check(response, evidence)
-    passed = all(checks.values())
-    
-    model_results['schema_prompted']['passes'].append(passed)
-    model_results['schema_prompted']['latencies'].append(latency)
-    trace = {
-        'patient': int(sid_test[local_idx]),
-        'subgroup': sg,
-        'risk': evidence['risk'],
-        'prompt': schema_prompt,
-        'response': response,
-        'checks': checks,
-        'passed': passed
-    }
-    model_results['schema_prompted']['traces'].append(trace)
-    llm_traces.append({'model': 'Qwen2.5-7B-Instruct', 'variant': 'schema_prompted', **trace})
-    
-    # (c) Loop 1 + Schema (no Loop 2)
-    loop1_prompt = f"Evidence: {json.dumps(evidence)}. Generate patient-friendly explanation including counterfactual changes."
-    inputs = tokenizer(f"User: {loop1_prompt}\nAssistant:", return_tensors="pt").to("cuda")
-    start = time.time()
-    with torch.no_grad():
-        out = model.generate(**inputs, max_new_tokens=200, do_sample=False, pad_token_id=tokenizer.eos_token_id)
-    latency = time.time() - start
-    response = tokenizer.decode(out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
-    
-    checks = verifier_check(response, evidence)
-    passed = all(checks.values())
-    
-    model_results['loop1_schema']['passes'].append(passed)
-    model_results['loop1_schema']['latencies'].append(latency)
-    trace = {
-        'patient': int(sid_test[local_idx]),
-        'subgroup': sg,
-        'risk': evidence['risk'],
-        'prompt': loop1_prompt,
-        'response': response,
-        'checks': checks,
-        'passed': passed
-    }
-    model_results['loop1_schema']['traces'].append(trace)
-    llm_traces.append({'model': 'Qwen2.5-7B-Instruct', 'variant': 'loop1_schema', **trace})
-    
-    # (d) Full Agentic (Loop 1 + Loop 2 Verifier Repair, M=3)
-    attempt = 1
-    response_current = response  # Start from Loop 1 + Schema response
-    checks = verifier_check(response_current, evidence)
-    passed = all(checks.values())
-    
-    while not passed and attempt < 3:
-        failed = [k for k, v in checks.items() if not v]
-        repair_prompt = f"Previous response failed checks: {failed}. Evidence: {json.dumps(evidence)}. Fix the issues and regenerate."
-        inputs = tokenizer(f"User: {repair_prompt}\nAssistant:", return_tensors="pt").to("cuda")
-        start = time.time()
-        with torch.no_grad():
-            out = model.generate(**inputs, max_new_tokens=200, do_sample=False, pad_token_id=tokenizer.eos_token_id)
-        latency = time.time() - start
-        response_current = tokenizer.decode(out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
-        checks = verifier_check(response_current, evidence)
-        passed = all(checks.values())
-        attempt += 1
-    
-    model_results['full_agentic']['passes'].append(passed)
-    model_results['full_agentic']['latencies'].append(latency)
-    trace = {
-        'patient': int(sid_test[local_idx]),
-        'subgroup': sg,
-        'risk': evidence['risk'],
-        'final_response': response_current,
-        'attempts': attempt,
-        'checks': checks,
-        'passed': passed
-    }
-    model_results['full_agentic']['traces'].append(trace)
-    llm_traces.append({'model': 'Qwen2.5-7B-Instruct', 'variant': 'full_agentic', **trace})
+
 
 # ============================================================
-# COMPUTE RESULTS
+# RESUME: load completed (patient, variant) pairs, repair torn tail
 # ============================================================
-print("\n[7B LLM Results]")
-for variant, res in model_results.items():
-    passes = res['passes']
-    latencies = res['latencies']
-    if passes:
-        final_pass = sum(passes) / len(passes) * 100
-        avg_lat = np.mean(latencies)
-        print(f"  {variant}: Final Pass = {final_pass:.1f}% ({sum(passes)}/{len(passes)}), Avg Latency = {avg_lat:.2f}s")
+def repair_trailing_partial_line(path):
+    """A killed process can leave a half-written last line. Truncate it."""
+    if not path.exists() or path.stat().st_size == 0:
+        return
+    with open(path, "rb") as f:
+        data = f.read()
+    if data.endswith(b"\n"):
+        return
+    cut = data.rfind(b"\n")
+    keep = data[:cut + 1] if cut >= 0 else b""
+    with open(path, "wb") as f:
+        f.write(keep)
+        f.flush()
+        os.fsync(f.fileno())
+    log(f"[Resume] truncated torn final line ({len(data) - len(keep)} bytes discarded)")
 
-# Attempt progression for full_agentic
-fa = model_results['full_agentic']
-attempts_passed = {1: 0, 2: 0, 3: 0}
-for t in fa['traces']:
-    a = t.get('attempts', 1)
-    if a >= 1: attempts_passed[1] += 1 if t['passed'] else 0
-    if a >= 2: attempts_passed[2] += 1 if t['passed'] else 0
-    if a >= 3: attempts_passed[3] += 1 if t['passed'] else 0
 
-print("\nAttempt progression:")
-for a in [1, 2, 3]:
-    passed = attempts_passed[a]
-    total = len(fa['traces'])
-    print(f"  Attempt {a}: {passed}/{total} = {passed/total*100:.1f}%")
+existing = {}
+duplicates_seen = 0
+if TRACES_PATH.exists() and not args.no_resume:
+    repair_trailing_partial_line(TRACES_PATH)
+    with open(TRACES_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            key = (rec.get("patient"), rec.get("variant"))
+            if key in existing:
+                duplicates_seen += 1
+            existing[key] = rec  # last write wins
+
+if existing:
+    models_seen = {r.get("model") for r in existing.values()}
+    if models_seen != {MODEL_LABEL}:
+        raise SystemExit(
+            f"[Resume] traces file contains records from {sorted(map(str, models_seen))}, "
+            f"but this run uses {MODEL_LABEL!r}. Use a fresh --traces-file or --no-resume."
+        )
+    if duplicates_seen:
+        # Rewrite compacted so the canonical file has exactly one record per key.
+        backup = TRACES_PATH.with_suffix(TRACES_PATH.suffix + ".dup.bak")
+        os.replace(TRACES_PATH, backup)
+        with open(TRACES_PATH, "w", encoding="utf-8") as f:
+            for rec in existing.values():
+                f.write(json.dumps(rec, default=str) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        log(f"[Resume] deduplicated {duplicates_seen} duplicate record(s); backup={backup.name}")
+
+done = set(existing.keys())
+todo_pairs = [(int(pid), v) for pid in eval_idx for v in SELECTED_VARIANTS
+              if (int(sid_test[pid]), v) not in done]
+log(f"[Resume] completed={len(done)} pending={len(todo_pairs)}")
+
 
 # ============================================================
-# SAVE RESULTS
+# MODEL LOADING (4-bit NF4, GPU 0 only)
 # ============================================================
-llm_results_7b = {model_name: model_results}
+tokenizer = None
+model = None
+load_seconds = None
+load_vram = {}
+vram_before = {}
 
-with open(RESULTS_DIR / 'llm_traces_7b.jsonl', 'w') as f:
-    for trace in llm_traces:
-        f.write(json.dumps(trace, default=str) + '\n')
+if not args.mock:
+    from transformers import BitsAndBytesConfig
 
-# Update metrics_verified.json with 7B results
-with open(RESULTS_DIR / 'metrics_verified.json', 'r') as f:
-    metrics = json.load(f)
+    log(f"[Load] {args.model} with 4-bit NF4 on GPU 0")
+    vram_before = vram_stats()
+    log(f"[VRAM] before load: {vram_before}")
 
-metrics['llm_evaluation_7b'] = llm_results_7b
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_compute_dtype=torch.float16,
+    )
 
-with open(RESULTS_DIR / 'metrics_verified.json', 'w') as f:
-    json.dump(metrics, f, indent=2, default=str)
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    tokenizer.padding_side = "left"
 
-print("\n[SUCCESS] 7B LLM evaluation completed and saved!")
-del model
-torch.cuda.empty_cache()
+    t0 = time.perf_counter()
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model,
+        quantization_config=bnb_config,
+        device_map={"": 0},
+        low_cpu_mem_usage=True,
+        attn_implementation="sdpa",
+    )
+    model.eval()
+    load_seconds = time.perf_counter() - t0
+    load_vram = vram_stats()
+
+    param_devices = {str(p.device) for p in model.parameters()}
+    log(f"[Load] done in {load_seconds:.1f}s | param devices={sorted(param_devices)}")
+    log(f"[VRAM] after load: {load_vram}")
+    log(f"[Load] hf_device_map={getattr(model, 'hf_device_map', None)}")
+    log(f"[Load] attn_implementation={getattr(model.config, '_attn_implementation', None)}")
+
+    if any(d in ("cpu", "meta") for d in param_devices):
+        raise RuntimeError(
+            f"Model was offloaded to {sorted(param_devices)}; refusing to benchmark "
+            "a CPU/meta-offloaded model. Check VRAM and quantisation config."
+        )
+
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.synchronize()
+
+
+# ============================================================
+# GENERATION (OOM-aware, transparent budget reduction)
+# ============================================================
+def _mock_generate(prompt, max_new_tokens, evidence, fail=False):
+    """Deterministic stand-in used only for --mock pipeline smoke tests."""
+    risk = evidence["risk"]
+    if fail:
+        body = f"This patient has a {risk}% risk of diabetes. Focus on diet and walking."
+    else:
+        body = (f"This patient has a {risk}% risk of diabetes. The {evidence['subgroup']} "
+                f"subgroup has {evidence['subgroup_coverage']}% coverage at the 90% level. "
+                f"Suggested changes: {evidence['counterfactual']['changes']}.")
+    return body, 0.0, max_new_tokens, 0
+
+
+def generate_text(prompt, max_new_tokens, evidence, mock_fail=False):
+    """Return (response, latency_s, effective_max_new_tokens, oom_retries).
+
+    Latency covers only tokenisation->generation->decode for this call.
+    On repeated OOM we halve the token budget and record it in the trace.
+    """
+    if args.mock:
+        return _mock_generate(prompt, max_new_tokens, evidence, fail=mock_fail)
+
+    inputs = tokenizer(f"User: {prompt}\nAssistant:", return_tensors="pt").to(model.device)
+    effective = int(max_new_tokens)
+    oom_retries = 0
+
+    for attempt in range(3):
+        try:
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            t0 = time.perf_counter()
+            with torch.inference_mode():
+                out = model.generate(
+                    **inputs,
+                    max_new_tokens=effective,
+                    do_sample=False,
+                    pad_token_id=tokenizer.eos_token_id,
+                )
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            latency = time.perf_counter() - t0
+            response = tokenizer.decode(
+                out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True
+            )
+            del out
+            return response, latency, effective, oom_retries
+        except torch.cuda.OutOfMemoryError:
+            oom_retries += 1
+            torch.cuda.empty_cache()
+            if attempt == 0:
+                log("  [OOM] cache cleared; retrying same token budget")
+                continue
+            new_effective = max(32, effective // 2)
+            if new_effective == effective:
+                break
+            effective = new_effective
+            log(f"  [OOM] retrying with reduced max_new_tokens={effective} "
+                f"(recorded in trace as oom_token_reduction)")
+        except RuntimeError as exc:
+            if "out of memory" not in str(exc).lower():
+                raise
+            oom_retries += 1
+            torch.cuda.empty_cache()
+            if attempt == 0:
+                continue
+            effective = max(32, effective // 2)
+            log(f"  [OOM] RuntimeError OOM; reduced max_new_tokens={effective}")
+
+    raise RuntimeError("generation failed after repeated CUDA OOM")
+
+
+# ============================================================
+# EVALUATION LOOP
+# ============================================================
+vram_events = []
+records_this_run = 0
+t_run_start = time.perf_counter()
+
+with open(TRACES_PATH, "a", encoding="utf-8") as trace_file:
+
+    def emit(rec):
+        global records_this_run
+        trace_file.write(json.dumps(rec, default=str) + "\n")
+        trace_file.flush()
+        os.fsync(trace_file.fileno())
+        records_this_run += 1
+
+    for pos, local_idx in enumerate(eval_idx):
+        z = X_test[local_idx]
+        sg = sg_test[local_idx]
+        p = p_test_cal[local_idx]
+        patient_id = int(sid_test[local_idx])
+
+        pending = [v for v in SELECTED_VARIANTS if (patient_id, v) not in done]
+        if not pending:
+            continue
+
+        delta, mahal, inside, p_final, tier_used, radius_mult, feasible = solve_with_recovery(
+            z, sg, 0.5, w_cal, b_cal, subgroup_stats)
+
+        cf_changes = {z_cols[i]: round(delta[i], 2)
+                      for i in range(len(delta)) if abs(delta[i]) > 1e-3}
+
+        evidence = {
+            'patient_id': patient_id,
+            'subgroup': sg,
+            'risk': round(p * 100, 1),
+            'prediction_set': [1, 0],
+            'coverage': '90%',
+            'counterfactual': {
+                'tier': tier_used,
+                'radius_mult': radius_mult,
+                'changes': cf_changes,
+                'inside_ellipsoid': bool(inside),
+            },
+            'subgroup_coverage': round(val_cov_per_sg.get(sg, 0) * 100, 1),
+            'ece': round(ece * 100, 1),
+        }
+
+        responses = {}  # variant -> dict(response, latency, checks, passed, ...)
+
+        # (a) Unconstrained
+        if 'unconstrained' in pending:
+            prompt = (f"Patient has {p*100:.1f}% diabetes risk. "
+                      f"Explain what lifestyle changes would reduce risk to <= 50%.")
+            resp, lat, used, oom = generate_text(prompt, TOKEN_BUDGETS['unconstrained'], evidence)
+            checks = verifier_check(resp, evidence)
+            passed = all(checks.values())
+            responses['unconstrained'] = dict(response=resp, latency=lat, checks=checks,
+                                              passed=passed, prompt=prompt,
+                                              max_new_tokens=used, oom_retries=oom)
+            emit({'model': MODEL_LABEL, 'variant': 'unconstrained', 'mock': bool(args.mock),
+                  'quantization': QUANT_LABEL, 'patient': patient_id, 'subgroup': sg,
+                  'risk': evidence['risk'], 'prompt': prompt, 'response': resp,
+                  'checks': checks, 'passed': passed, 'latency_s': round(lat, 3),
+                  'max_new_tokens': used, 'oom_retries': oom})
+
+        # (b) Schema prompted
+        if 'schema_prompted' in pending:
+            prompt = f"Evidence: {json.dumps(evidence)}. Generate patient-friendly explanation."
+            resp, lat, used, oom = generate_text(prompt, TOKEN_BUDGETS['schema_prompted'], evidence)
+            checks = verifier_check(resp, evidence)
+            passed = all(checks.values())
+            responses['schema_prompted'] = dict(response=resp, latency=lat, checks=checks,
+                                                passed=passed, prompt=prompt,
+                                                max_new_tokens=used, oom_retries=oom)
+            emit({'model': MODEL_LABEL, 'variant': 'schema_prompted', 'mock': bool(args.mock),
+                  'quantization': QUANT_LABEL, 'patient': patient_id, 'subgroup': sg,
+                  'risk': evidence['risk'], 'prompt': prompt, 'response': resp,
+                  'checks': checks, 'passed': passed, 'latency_s': round(lat, 3),
+                  'max_new_tokens': used, 'oom_retries': oom})
+
+        # (c) Loop 1 + schema (no repair)
+        if 'loop1_schema' in pending:
+            prompt = (f"Evidence: {json.dumps(evidence)}. Generate patient-friendly "
+                      f"explanation including counterfactual changes.")
+            resp, lat, used, oom = generate_text(prompt, TOKEN_BUDGETS['loop1_schema'], evidence)
+            checks = verifier_check(resp, evidence)
+            passed = all(checks.values())
+            responses['loop1_schema'] = dict(response=resp, latency=lat, checks=checks,
+                                             passed=passed, prompt=prompt,
+                                             max_new_tokens=used, oom_retries=oom)
+            emit({'model': MODEL_LABEL, 'variant': 'loop1_schema', 'mock': bool(args.mock),
+                  'quantization': QUANT_LABEL, 'patient': patient_id, 'subgroup': sg,
+                  'risk': evidence['risk'], 'prompt': prompt, 'response': resp,
+                  'checks': checks, 'passed': passed, 'latency_s': round(lat, 3),
+                  'max_new_tokens': used, 'oom_retries': oom})
+
+        # (d) Full agentic: Loop 1 response + verifier-driven repairs
+        if 'full_agentic' in pending:
+            if 'loop1_schema' in responses:
+                base = responses['loop1_schema']
+            else:
+                prompt = (f"Evidence: {json.dumps(evidence)}. Generate patient-friendly "
+                          f"explanation including counterfactual changes.")
+                resp, lat, used, oom = generate_text(prompt, TOKEN_BUDGETS['full_agentic'], evidence)
+                base = dict(response=resp, latency=lat, checks=verifier_check(resp, evidence),
+                            prompt=prompt, max_new_tokens=used, oom_retries=oom)
+                base['passed'] = all(base['checks'].values())
+
+            current_response = base['response']
+            current_checks = base['checks']
+            passed = all(current_checks.values())
+            attempts = 1
+            total_latency = base['latency']
+            attempt_latencies = [round(base['latency'], 3)]
+            attempt_checks = [current_checks]
+            total_oom = base.get('oom_retries', 0)
+            used_budget = base.get('max_new_tokens', TOKEN_BUDGETS['full_agentic'])
+
+            while not passed and attempts < args.max_attempts:
+                failed = [k for k, v in current_checks.items() if not v]
+                prompt = (f"Previous response failed checks: {failed}. "
+                          f"Evidence: {json.dumps(evidence)}. Fix the issues and regenerate.")
+                current_response, lat, used_budget, oom = generate_text(
+                    prompt, TOKEN_BUDGETS['full_agentic'], evidence)
+                current_checks = verifier_check(current_response, evidence)
+                passed = all(current_checks.values())
+                attempts += 1
+                total_latency += lat
+                total_oom += oom
+                attempt_latencies.append(round(lat, 3))
+                attempt_checks.append(current_checks)
+
+            emit({'model': MODEL_LABEL, 'variant': 'full_agentic', 'mock': bool(args.mock),
+                  'quantization': QUANT_LABEL, 'patient': patient_id, 'subgroup': sg,
+                  'risk': evidence['risk'], 'prompt': base['prompt'],
+                  'final_response': current_response, 'response': current_response,
+                  'attempts': attempts, 'attempt_checks': attempt_checks,
+                  'checks': current_checks, 'passed': passed,
+                  'latency_s': round(total_latency, 3),
+                  'attempt_latencies': attempt_latencies,
+                  'max_new_tokens': used_budget, 'oom_retries': total_oom})
+
+        done.update((patient_id, v) for v in pending)
+
+        if pos % 5 == 0 or pos == len(eval_idx) - 1:
+            elapsed = time.perf_counter() - t_run_start
+            stats = vram_stats()
+            vram_events.append({"patient": patient_id, **stats})
+            log(f"[{pos+1}/{len(eval_idx)}] patient={patient_id} sg={sg} "
+                f"risk={evidence['risk']:.1f} | emitted={records_this_run} | "
+                f"elapsed={elapsed/60:.1f}min | VRAM peak={stats.get('peak_allocated_GB')}GB "
+                f"free={stats.get('free_GB')}GB")
+
+
+# ============================================================
+# AGGREGATE (from the canonical trace file, deduplicated)
+# ============================================================
+def load_traces(path):
+    """Return {(patient,variant): rec}, last record wins."""
+    out = {}
+    if not Path(path).exists():
+        return out
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            out[(rec.get("patient"), rec.get("variant"))] = rec
+    return out
+
+
+canonical = load_traces(TRACES_PATH)
+scope_keys = {(int(sid_test[pid]), v) for pid in eval_idx for v in SELECTED_VARIANTS}
+scoped = {k: rec for k, rec in canonical.items() if k in scope_keys}
+
+per_variant = {}
+for variant in SELECTED_VARIANTS:
+    recs = [rec for (pid, v), rec in scoped.items() if v == variant]
+    n = len(recs)
+    if n == 0:
+        per_variant[variant] = {"n": 0, "completed": False}
+        continue
+    passed = sum(1 for r in recs if r.get("passed"))
+    lats = sorted(float(r.get("latency_s", 0.0)) for r in recs)
+    per_variant[variant] = {
+        "n": n,
+        "completed": n == len(eval_idx),
+        "passed": passed,
+        "final_pass_pct": round(100.0 * passed / n, 2),
+        "latency_mean_s": round(float(np.mean(lats)), 3),
+        "latency_median_s": round(float(np.median(lats)), 3),
+        "latency_p95_s": round(float(np.percentile(lats, 95)), 3),
+        "tokens_per_s_mean": round(float(np.mean([
+            r.get("max_new_tokens", TOKEN_BUDGETS[variant]) / max(float(r.get("latency_s", 0.0)), 1e-6)
+            for r in recs])), 2),
+        "oom_retries_total": int(sum(int(r.get("oom_retries", 0)) for r in recs)),
+    }
+
+full = [rec for (pid, v), rec in scoped.items() if v == 'full_agentic']
+attempt_progression = {}
+fallback = None
+fallback_pct = None
+if full:
+    counts = {}
+    for r in full:
+        a = int(r.get("attempts", 1))
+        counts[a] = counts.get(a, 0) + 1
+    n = len(full)
+    attempt_progression = {
+        "attempt_1_pass": counts.get(1, 0),
+        "attempt_2_pass": counts.get(2, 0),
+        "attempt_3_pass": counts.get(3, 0),
+        "attempt_1_pct": round(100.0 * counts.get(1, 0) / n, 2),
+        "attempt_2_pct": round(100.0 * counts.get(2, 0) / n, 2),
+        "attempt_3_pct": round(100.0 * counts.get(3, 0) / n, 2),
+        "attempt_1_cum_pct": round(100.0 * counts.get(1, 0) / n, 2),
+        "attempt_2_cum_pct": round(100.0 * (counts.get(1, 0) + counts.get(2, 0)) / n, 2),
+        "attempt_3_cum_pct": round(100.0 * (counts.get(1, 0) + counts.get(2, 0)
+                                             + counts.get(3, 0)) / n, 2),
+    }
+    passed_full = sum(1 for r in full if r.get("passed"))
+    fallback = n - passed_full
+    fallback_pct = round(100.0 * fallback / n, 2)
+
+complete = all(per_variant.get(v, {}).get("completed") for v in SELECTED_VARIANTS)
+all_variants = set(SELECTED_VARIANTS) == set(VARIANT_ORDER)
+elapsed_total = time.perf_counter() - t_run_start
+
+summary = {
+    "model": MODEL_LABEL,
+    "requested_model": args.model,
+    "mock": bool(args.mock),
+    "quantization": QUANT_LABEL,
+    "seed": args.seed,
+    "timestamp": datetime.now().isoformat(),
+    "protocol": {
+        "n_high_risk_available": int(len(high_risk_idx)),
+        "n_patients_evaluated": int(len(eval_idx)),
+        "variants": SELECTED_VARIANTS,
+        "max_attempts": int(args.max_attempts),
+        "token_budgets": TOKEN_BUDGETS,
+        "decoding": "greedy (do_sample=False)",
+        "prompt_templates": "identical to run_llm_eval_fixed.py (1.5B)",
+    },
+    "complete_full_protocol": bool(complete and all_variants and args.max_attempts >= 3
+                                   and len(eval_idx) == len(high_risk_idx)),
+    "variants": per_variant,
+    "attempt_progression": attempt_progression,
+    "fallback": fallback,
+    "fallback_pct": fallback_pct,
+    "runtime": {
+        "model_load_s": round(load_seconds, 2) if load_seconds else None,
+        "evaluation_s": round(elapsed_total, 2),
+        "evaluation_min": round(elapsed_total / 60, 2),
+        "records_written_this_run": records_this_run,
+        "duplicates_removed_on_resume": duplicates_seen,
+    },
+    "vram": {
+        "before_load": vram_before,
+        "after_load": load_vram,
+        "peak_allocated_GB": round(torch.cuda.max_memory_allocated() / 1e9, 3)
+        if torch.cuda.is_available() else None,
+        "samples": vram_events[-5:],
+    },
+}
+
+if args.mock and "metrics_verified" in METRICS_PATH.name:
+    raise SystemExit("Refusing to write MOCK results into the canonical metrics file.")
+
+# Merge under llm_evaluation_7b without touching other keys.
+metrics = {}
+if METRICS_PATH.exists():
+    try:
+        with open(METRICS_PATH, "r", encoding="utf-8") as f:
+            metrics = json.load(f)
+    except json.JSONDecodeError:
+        metrics = {}
+metrics["llm_evaluation_7b"] = summary
+atomic_write_json(METRICS_PATH, metrics)
+
+log("\n[7B Results]")
+for variant in SELECTED_VARIANTS:
+    d = per_variant.get(variant, {})
+    if d.get("n"):
+        log(f"  {variant}: Final Pass = {d['final_pass_pct']:.1f}% "
+            f"({d['passed']}/{d['n']}), mean latency = {d['latency_mean_s']:.2f}s, "
+            f"p95 = {d['latency_p95_s']:.2f}s")
+if attempt_progression:
+    log(f"  attempts: 1={attempt_progression['attempt_1_pass']} "
+        f"2={attempt_progression['attempt_2_pass']} 3={attempt_progression['attempt_3_pass']} "
+        f"| fallback={fallback} ({fallback_pct}%)")
+log(f"[Done] traces={TRACES_PATH} metrics={METRICS_PATH} "
+    f"elapsed={elapsed_total/60:.1f}min complete={summary['complete_full_protocol']}")
