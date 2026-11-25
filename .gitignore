@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Local env / secrets
+.env
+.env.*
+
+# Backups produced by the integration scripts
+*.bak-*
+*.dup.bak
+
+# Partial / temporary result artifacts
+results/*.tmp
+results/*.jsonl.tmp
+results/mock_*.jsonl
+results/mock_*.json
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.blg
+*.bbl
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
