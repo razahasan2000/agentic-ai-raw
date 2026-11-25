@@ -1,0 +1,15 @@
+# LLM inference dependencies for src/run_llm_7b_benchmark.py
+# and src/run_llm_eval_fixed.py.
+#
+# Install a CUDA build of torch first, matching your driver, e.g.:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# then:
+#   pip install -r requirements.txt -r requirements-llm.txt
+
+torch>=2.4
+transformers>=5.0,<6
+accelerate>=1.0
+bitsandbytes>=0.43
+safetensors>=0.4
+huggingface_hub>=0.24
+sentencepiece>=0.2

@@ -1,76 +1,112 @@
 #!/usr/bin/env python3
 """
-Generate Figure 4: LLM Loop 2 Repair Progression
+Figure 4: Loop 2 repair progression, 1.5B vs 4-bit 7B.
+
+Reads the raw trace files and plots cumulative pass rate after attempt 1, 2
+and 3 for the full agentic variant. No values are hardcoded: if the 7B trace
+file is missing the figure falls back to 1.5B only and says so.
+
+Outputs (repo root + results/figures):
+  fig4_llm_repair.png / .pdf
 """
 
 import json
+import sys
+from pathlib import Path
+
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Load LLM traces
-with open('C:/Users/Raza-SEAGUARD/Downloads/Agentic AI/reproducibility_package/results/llm_traces.jsonl', 'r') as f:
-    traces = [json.loads(line) for line in f]
 
-# Filter for full_agentic variant
-full_agentic = [t for t in traces if t.get('variant') == 'full_agentic']
-schema_prompted = [t for t in traces if t.get('variant') == 'schema_prompted']
+ROOT = Path(__file__).resolve().parent.parent
+RESULTS = ROOT / "results"
+OUT_DIRS = [ROOT, RESULTS / "figures"]
 
-# Compute pass rates by attempt
-attempts = [1, 2, 3]
-pass_rates = []
-counts = []
 
-for a in attempts:
-    # For full_agentic, count how many passed by attempt a
-    passed_at_a = sum(1 for t in full_agentic if t.get('attempts', 1) <= a and t.get('passed', False))
-    total = len(full_agentic)
-    pass_rates.append(passed_at_a / total * 100)
-    counts.append(f"{passed_at_a}/{total}")
+def load_full_agentic(path):
+    """Return list of records for the full_agentic variant."""
+    path = Path(path)
+    if not path.exists():
+        return None
+    recs = {}
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if r.get("variant") == "full_agentic" and not r.get("mock"):
+                recs[(r.get("patient"), r.get("variant"))] = r
+    return list(recs.values()) if recs else None
 
-# Schema prompted (single attempt)
-schema_pass = sum(1 for t in schema_prompted if t.get('passed', False))
-schema_total = len(schema_prompted)
-schema_rate = schema_pass / schema_total * 100
 
-# Plot
-fig, ax = plt.subplots(figsize=(10, 6))
+def cumulative(records):
+    n = len(records)
+    if n == 0:
+        return None
+    passed = [r for r in records if r.get("passed")]
+    return [
+        100.0 * sum(1 for r in passed if int(r.get("attempts", 1)) <= k) / n
+        for k in (1, 2, 3)
+    ], n
 
-x_pos = np.arange(len(attempts))
-bars = ax.bar(x_pos, pass_rates, color=['#2ecc71', '#3498db', '#9b59b6'], 
-              edgecolor='black', linewidth=1.2, width=0.6)
 
-# Add value labels on bars
-for i, (bar, rate, count) in enumerate(zip(bars, pass_rates, counts)):
-    ax.text(bar.get_x() + bar.get_width()/2., bar.get_height() + 1,
-            f'{rate:.1f}%\n({count})', ha='center', va='bottom', fontsize=11, fontweight='bold')
+def main():
+    series = []
 
-# Add schema prompted reference line
-ax.axhline(y=schema_rate, color='#e74c3c', linestyle='--', linewidth=2, 
-           label=f'Schema Prompted (1-shot): {schema_rate:.1f}% ({schema_pass}/{schema_total})')
+    r15 = load_full_agentic(RESULTS / "llm_traces.jsonl")
+    if r15:
+        vals, n = cumulative(r15)
+        series.append(("Qwen2.5-1.5B", vals, n, "#4C72B0"))
 
-ax.set_ylabel('Verifier Pass Rate (%)', fontsize=13)
-ax.set_xlabel('Loop 2 Attempt', fontsize=13)
-ax.set_title('Loop 2 Repair Progression: Qwen2.5-1.5B-Instruct on 86 High-Risk Patients (Seed 3)', fontsize=14, fontweight='bold')
-ax.set_xticks(x_pos)
-ax.set_xticklabels(['Attempt 1', 'Attempt 2', 'Attempt 3'], fontsize=12)
-ax.set_ylim(0, 110)
-ax.legend(loc='lower right', fontsize=11)
-ax.grid(axis='y', alpha=0.3)
+    r7 = load_full_agentic(RESULTS / "llm_traces_7b.jsonl")
+    if r7:
+        vals, n = cumulative(r7)
+        series.append(("Qwen2.5-7B (4-bit)", vals, n, "#DD8452"))
 
-# Add improvement annotation
-improvement = pass_rates[-1] - pass_rates[0]
-ax.annotate(f'Repair Gain: +{improvement:.1f} pp', 
-            xy=(2, pass_rates[2]), xytext=(1.5, 85),
-            arrowprops=dict(arrowstyle='->', color='black', lw=1.5),
-            fontsize=11, fontweight='bold', color='#e74c3c',
-            bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='#e74c3c'))
+    if not series:
+        print("[fig4] no trace files found; nothing to plot", file=sys.stderr)
+        return 1
 
-plt.tight_layout()
-plt.savefig('C:/Users/Raza-SEAGUARD/Downloads/Agentic AI/reproducibility_package/results/figures/fig4_llm_repair.png', dpi=300, bbox_inches='tight')
-plt.savefig('C:/Users/Raza-SEAGUARD/Downloads/Agentic AI/reproducibility_package/results/figures/fig4_llm_repair.pdf', bbox_inches='tight')
-print("Figure 4 saved!")
-print(f"Pass rates: {pass_rates}")
-print(f"Schema prompted: {schema_rate:.1f}%")
-print(f"Repair gain: {improvement:.1f} pp")
+    labels = ["Attempt 1", "Attempt 2", "Attempt 3"]
+    x = np.arange(len(labels))
+    width = 0.8 / len(series)
+
+    fig, ax = plt.subplots(figsize=(7.0, 4.2))
+    for i, (name, vals, n, colour) in enumerate(series):
+        offset = (i - (len(series) - 1) / 2) * width
+        bars = ax.bar(x + offset, vals, width, label=f"{name} (N={n})",
+                      color=colour, edgecolor="black", linewidth=0.6)
+        for b, v in zip(bars, vals):
+            ax.text(b.get_x() + b.get_width() / 2, v + 1.0, f"{v:.1f}",
+                    ha="center", va="bottom", fontsize=8)
+
+    ax.set_ylabel("Cumulative pass rate (%)")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, 108)
+    ax.axhline(100, color="grey", linestyle=":", linewidth=0.8)
+    ax.grid(axis="y", alpha=0.3)
+    ax.set_axisbelow(True)
+    ax.legend(frameon=False, loc="lower right", fontsize=9)
+    ax.set_title("Loop 2 verifier repair: cumulative pass rate", fontsize=11)
+    fig.tight_layout()
+
+    for d in OUT_DIRS:
+        d.mkdir(parents=True, exist_ok=True)
+        fig.savefig(d / "fig4_llm_repair.png", dpi=300, bbox_inches="tight")
+        fig.savefig(d / "fig4_llm_repair.pdf", bbox_inches="tight")
+
+    print("[fig4] wrote fig4_llm_repair.png/.pdf")
+    for name, vals, n, _ in series:
+        print(f"  {name}: " + " -> ".join(f"{v:.1f}%" for v in vals) + f" (N={n})")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
