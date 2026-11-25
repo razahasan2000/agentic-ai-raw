@@ -30,8 +30,11 @@ ROOT = Path(__file__).parent.parent
 RESULTS_DIR = ROOT / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Set HF token
-os.environ["HF_TOKEN"] = "REDACTED_HF_TOKEN"
+# Set HF token from environment variable
+hf_token = os.environ.get("HF_TOKEN")
+if not hf_token:
+    raise ValueError("HF_TOKEN environment variable not set")
+os.environ["HF_TOKEN"] = hf_token
 
 # ============================================================
 # LOAD DATA
