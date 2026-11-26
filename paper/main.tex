@@ -376,10 +376,10 @@ Our framework differs from prior work by combining conformal calibration with hi
 \end{itemize}
 All extended analyses, proofs, and implementation details are in \texttt{supplementary.pdf}, cross-referenced via \texttt{supp-} prefix (Supplementary Notes S1--S8). See Supplementary Note S8 (\ref{supp-sec:repro}) for the full reproducibility guide.
 
+
+\subsection{Conclusion}
+
 \bibliographystyle{plain}
 \bibliography{../references_final}
 
-
-\subsection{Conclusion}
-We presented a conformal-grounded agentic explanation framework with all metrics verified via a 20-seed pipeline. Key results: LR AUC 0.770; conformal coverage 91.3\% [88.7\%, 94.0\%]; worst-subgroup 84.4\% [76.2\%, 92.6\%]; counterfactual reach 100\% with 100\% containment; mean $\|\boldsymbol\delta\|_2=1.38$ SD; Wald attribution with sandwich SEs identifies Age (47.5\% seed significance); validation ECE 3.9\%; LLM Loop 2: 94.2\% (1.5B) and 100.0\% (7B) final pass. All from a single reproducible pipeline with 4-way split and 20 seeds.
 \end{document}
