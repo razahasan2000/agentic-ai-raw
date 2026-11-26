@@ -36,7 +36,9 @@ Subgroup-Calibrated Counterfactual Recovery and Verified Clinical Narratives}
 \begin{abstract}
 Clinical risk prediction models often operate as opaque scoring engines whose outputs are difficult to justify. Post-hoc explanation methods provide no formal guarantees of correctness, fairness, or stability across patient subgroups. We propose a conformal-grounded agentic explanation framework that couples group-conditional conformal calibration with hierarchical shrinkage, geometric counterfactual search within plausibility ellipsoids, and inference-valid feature attribution via Wald tests on the calibrated logistic regression. An agentic orchestrator enables iterative counterfactual recovery by escalating intervention tiers (behavioral $\to$ anthropometric $\to$ clinical) and relaxing plausibility ellipsoid radii ($1.0\times \to 1.5\times \to 2.0\times$), with binary features constrained to valid state transitions ($z_i + \delta_i \in \{0,1\}$). A verifier agent audits every numeric claim in generated explanations, rejecting hallucinations via up to $M=3$ repair retries.
 
-The framework is evaluated on NHANES 2017--2018 (5,533 adults) for prevalent diabetes prediction using features excluding HbA1c and glucose to avoid circularity. The base logistic regression achieves mean AUC 0.770 (95\% CI: 0.742--0.798) across 20 stratified seeds. Subgroup-conditional conformal calibration with empirical Bayes shrinkage and DKW guardrail yields overall test coverage 91.3\% (target 90\%, 95\% CI: 88.7\%--94.0\%), with subgroup coverage ranging 88.6\%--93.0\%. A 20-seed stability analysis shows EB-MinCov achieves 84.4\% worst-subgroup coverage (vs. 81.1\% for Mondrian, 80.9\% for Standard EB, 82.3\% for Marginal Split and Complete Pooling), with an 11.1\% max coverage gap. Counterfactual optimization on the calibrated model reaches target risk ($\le$50\%) for 100\% of high-risk patients (mean 55 per seed) via iterative tier escalation (Tier 1: 56.1\%, Tier 2: 43.9\%, Tier 3: 0.0\%) and radius relaxation (Tier 1 $1.0\times$: 35.6\%, Tier 1 $1.5\times$: 20.2\%, Tier 2 $1.0\times$: 23.3\%, Tier 2 $1.5\times$: 20.2\%, Tier 1 $2.0\times$: 0.3\%, Tier 2 $2.0\times$: 0.5\%, Tier 3: 0.0\%), with 100\% ellipsoid containment and mean $\|\boldsymbol{\delta}\|_2 = 1.38$ SD units. Wald-test attribution with Benjamini--Hochberg correction (FDR 10\%) identifies Age (100\% of seeds) and Waist circumference (100\%) as consistently significant, while SBP (85\%) and Moderate Activity (35\%) reach global significance in a majority/subset of seeds but have lower per-subgroup power (0\%--50\%). A deployable auditor monitors conformal+audit validation coverage and ECE (3.9\%), with all validation subgroup coverages exceeding the 80\% abstention threshold. Multi-model conformal baselines (Marginal, Mondrian, Complete Pooling, Standard EB, EB-MinCov) are benchmarked across 20 seeds. Nonlinear XGBoost and LightGBM achieve calibrated AUCs of 0.785 and 0.788 with 100\% counterfactual reach. LLM Loop 2 verification on 86 high-risk patients (seed 3, Qwen2.5-1.5B-Instruct) achieves 94.2\% final pass rate (67.4\% Attempt 1 $\to$ 91.9\% Attempt 2 $\to$ 94.2\% Attempt 3, M=3). Unlabeled drift detection (MMD, KS, Mahalanobis) is evaluated under progressive covariate corruption. Only NHANES 2017--2018 is available; multi-cycle temporal validation is not performed. All numbers are generated from a single reproducible pipeline with a 4-way data split (50\%/15\%/15\%/20\%) and 20 stratified seeds.
+The framework is evaluated on NHANES 2017--2018 (5,533 adults) for prevalent diabetes prediction using features excluding HbA1c and glucose to avoid circularity. The base logistic regression achieves mean AUC 0.770 (95\% CI: 0.742--0.798) across 20 stratified seeds. Subgroup-conditional conformal calibration with empirical Bayes shrinkage and DKW guardrail yields overall test coverage 91.3\% (target 90\%, 95\% CI: 88.7\%--94.0\%), with subgroup coverage ranging 88.6\%--93.0\%. A 20-seed stability analysis shows EB-MinCov achieves 84.4\% worst-subgroup coverage (vs. 81.1\% for Mondrian, 80.9\% for Standard EB, 82.3\% for Marginal Split and Complete Pooling), with an 11.1\% max coverage gap. Counterfactual optimization on the calibrated model reaches target risk ($\le$50\%) for 100\% of high-risk patients (mean 55 per seed) via iterative tier escalation (Tier 1: 56.1\%, Tier 2: 43.9\%, Tier 3: 0.0\%) and radius relaxation (Tier 1 $1.0\times$: 35.6\%, Tier 1 $1.5\times$: 20.2\%, Tier 2 $1.0\times$: 23.3\%, Tier 2 $1.5\times$: 20.2\%, Tier 1 $2.0\times$: 0.3\%, Tier 2 $2.0\times$: 0.5\%, Tier 3: 0.0\%), with 100\% ellipsoid containment and mean $\|\boldsymbol{\delta}\|_2 = 1.38$ SD units. Wald-test attribution with Benjamini--Hochberg correction (FDR 10\%) identifies Age (100\% of seeds) and Waist circumference (100\%) as consistently significant, while SBP (85\%) and Moderate Activity (35\%) reach global significance in a majority/subset of seeds but have lower per-subgroup power (0\%--50\%). A deployable auditor monitors conformal+audit validation coverage and ECE (3.9\%), with all validation subgroup coverages exceeding the 80\% abstention threshold. Multi-model conformal baselines (Marginal, Mondrian, Complete Pooling, Standard EB, EB-MinCov) are benchmarked across 20 seeds. Nonlinear XGBoost and LightGBM achieve calibrated AUCs of 0.785 and 0.788 with 100\% counterfactual reach. % LLM7B:ABSTRACT:BEGIN
+LLM Loop 2 verification on 86 high-risk patients (seed 3) achieves 94.2\% final pass for Qwen2.5-1.5B-Instruct (67.4\% $\to$ 91.9\% $\to$ 94.2\%, $M=3$) and 100.0\% for 4-bit Qwen2.5-7B-Instruct (33.7\% $\to$ 87.2\% $\to$ 100.0\%, $M=3$), with fallback rates 5.8\% and 0.0\%.
+% LLM7B:ABSTRACT:END Unlabeled drift detection (MMD, KS, Mahalanobis) is evaluated under progressive covariate corruption. Only NHANES 2017--2018 is available; multi-cycle temporal validation is not performed. All numbers are generated from a single reproducible pipeline with a 4-way data split (50\%/15\%/15\%/20\%) and 20 stratified seeds.
 \end{abstract}
 
 \section{Introduction}
@@ -411,37 +413,68 @@ LightGBM & 0.792 $[0.764, 0.820]$ & 0.788 $[0.760, 0.816]$ \\
 
 \paragraph{Perturbation Stability.} Adding $\pm 0.1$ SD Gaussian noise to BMI/Waist/SBP/DBP: Wald attribution Kendall's $\tau = 0.92$, Counterfactual cosine similarity $= 0.96$, vs. TreeSHAP $\tau = 0.78$ (LIME not run in verified pipeline).
 
-\subsection{LLM-Based Loop 2 Verification (1 Seed, Qwen2.5-1.5B-Instruct)}
+% LLM7B:HEADING:BEGIN
+\subsection{LLM-Based Loop 2 Verification (1 Seed, Qwen2.5-1.5B and 4-bit 7B-Instruct)}
+% LLM7B:HEADING:END
 \label{sec:multillm}
 
-We evaluated four LLM variants across all 86 high-risk patients ($p > 0.5$) from seed 3: (i) Unconstrained LLM (no tools, no verifier), (ii) Single-Shot Schema LLM (no Loop 1, no Loop 2), (iii) Loop 1 + Schema LLM (no Loop 2), (iv) Full Agentic Loop (Loop 1 + Loop 2 Verifier Repair, M=3). We tested Qwen2.5-1.5B-Instruct (4-bit quantized on 8.6 GB VRAM). Table~\ref{tab:multillm} summarizes results.
+% LLM7B:INTRO:BEGIN
+We evaluated four LLM variants across all 86 high-risk patients ($p > 0.5$) from seed 3: (i) Unconstrained LLM (no tools, no verifier), (ii) Single-Shot Schema LLM (no Loop 1, no Loop 2), (iii) Loop 1 + Schema LLM (no Loop 2), (iv) Full Agentic Loop (Loop 1 + Loop 2 Verifier Repair, $M=3$). We tested Qwen2.5-1.5B-Instruct in FP16 and Qwen2.5-7B-Instruct in 4-bit NF4 on an 8.6 GB RTX 4070 Laptop GPU, with identical prompts, verifier, token budgets and decoding. Table~\ref{tab:multillm} summarizes results.
+% LLM7B:INTRO:END
 
+% LLM7B:TABLE8:BEGIN
 \begin{table}[htbp]
 \centering
-\caption{LLM agentic evaluation on 86 high-risk patients (seed 3, $p > 0.5$), Qwen2.5-1.5B-Instruct.}
+\caption{LLM Loop-2 evaluation on high-risk patients (seed 3, $p>0.5$). Qwen2.5-1.5B and 4-bit Qwen2.5-7B use identical prompts, verifier, token budgets and $M=3$ repair; values are recomputed from the raw trace files. Bold marks the higher final pass rate of the two models for that variant. $N=86$ patients per model. Loop-1 counterfactual reach and ellipsoid containment are 100\% for both models (solver property, independent of the LLM).
+}
 \label{tab:multillm}
 \resizebox{\linewidth}{!}{\begin{tabular}{lcccccccc}
 \toprule
-Variant & Reach & Ellipsoid & Att. 1 & Att. 2 & Att. 3 & Final & Fallback & Latency (s) \\
+& \multicolumn{4}{c}{Qwen2.5-1.5B-Instruct} & \multicolumn{4}{c}{Qwen2.5-7B-Instruct (4-bit NF4)} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+Variant & Att.~1 & Final & Fallback & Lat.(s) & Att.~1 & Final & Fallback & Lat.(s) \\
 \midrule
-Unconstrained LLM & 0.0\% & 0.0\% & -- & -- & -- & 0.0\% & 100.0\% & 3.3 \\
-Schema Prompted (1-shot) & 69.8\% & 69.8\% & 69.8\% & -- & -- & 69.8\% & 30.2\% & 5.0 \\
-Loop 1 + Schema (no Loop 2) & 100.0\% & 100.0\% & 67.4\% & -- & -- & 67.4\% & 32.6\% & 4.9 \\
-Full Agentic (Loop 1 + Loop 2, M=3) & \textbf{100.0\%} & \textbf{100.0\%} & 67.4\% & 91.9\% & 94.2\% & \textbf{94.2\%} & 5.8\% & 5.0 \\
+Unconstrained LLM & 0.0\% & 0.0\% & 100.0\% & 3.3 & 0.0\% & 0.0\% & 100.0\% & 29.3 \\
+Schema Prompted (1-shot) & 69.8\% & \textbf{69.8\%} & 30.2\% & 5.0 & 53.5\% & 53.5\% & 46.5\% & 44.2 \\
+Loop 1 + Schema (no Loop 2) & 67.4\% & \textbf{67.4\%} & 32.6\% & 4.9 & 33.7\% & 33.7\% & 66.3\% & 44.0 \\
+Full Agentic (Loop 1 + Loop 2, M=3) & 67.4\% & 94.2\% & 5.8\% & 4.9 & 33.7\% & \textbf{100.0\%} & 0.0\% & 78.8 \\
 \bottomrule
 \end{tabular}}
 \end{table}
+% LLM7B:TABLE8:END
 
-\paragraph{Loop 2 Repair Progression.} Figure~\ref{fig:llm_repair} shows monotonic Attempt 1 $\to$ 2 $\to$ 3 pass rates: 67.4\% $\to$ 91.9\% $\to$ 94.2\%. The repair gain (67.4\% $\to$ 94.2\%, +26.7 percentage points) demonstrates that the Verifier Agent successfully catches and repairs errors. The 5.8\% fallback rate (5/86) corresponds to cases where all 3 attempts failed.
+% LLM7B:PROGRESSION:BEGIN
+\paragraph{Loop 2 Repair Progression.} Figure~\ref{fig:llm_repair} shows monotonic Attempt 1 $\to$ 2 $\to$ 3 pass rates. Qwen2.5-1.5B goes 67.4\% $\to$ 91.9\% $\to$ 94.2\% (repair gain +26.7~pp; fallback 5.8\%). Qwen2.5-7B goes 33.7\% $\to$ 87.2\% $\to$ 100.0\% (repair gain +66.3~pp; fallback 0.0\%). The larger model starts from a lower Attempt-1 pass rate (33.7\% vs 67.4\%), so model scale does not remove the need for verification; the Verifier Agent repairs errors for both model sizes.
+% LLM7B:PROGRESSION:END
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.9\linewidth]{fig4_llm_repair.png}
-\caption{Loop 2 repair progression: monotonic Attempt 1 $\to$ 2 $\to$ 3 pass rates for Qwen2.5-1.5B-Instruct on 86 high-risk patients.}
+% LLM7B:FIG4CAP:BEGIN
+\caption{Loop 2 verifier repair: cumulative pass rate after attempts 1--3 for Qwen2.5-1.5B and 4-bit Qwen2.5-7B-Instruct on 86 high-risk patients (seed 3). Bars are computed from the trace files.}
+% LLM7B:FIG4CAP:END
 \label{fig:llm_repair}
 \end{figure}
 
-\paragraph{Failure Taxonomy.} For Full Agentic (94.2\% final pass, 5.8\% fallback): Missing subgroup caveat (5.8\%), Numeric drift (0\%), Frozen-feature leak (0\%), Invented clinical term (0\%).
+% LLM7B:RUNTIME:BEGIN
+\begin{table}[htbp]
+\centering
+\caption{Measured runtime and memory profile on the RTX 4070 Laptop (8.6 GB, 30 W power cap). VRAM is the CUDA peak allocation measured by the benchmark; generation time is the sum of per-call latencies recorded in the traces (resume-invariant). The 1.5B run was not instrumented for VRAM or load time (--).}
+\label{tab:runtime}
+\resizebox{\linewidth}{!}{\begin{tabular}{llccccc}
+\toprule
+Model & Quantisation & Load (s) & Peak VRAM (GB) & Mean lat.(s) & Generation time (min) & Calls \\
+\midrule
+Qwen2.5-1.5B & FP16 & -- & -- & 4.5 & 26.1 & 344 \\
+Qwen2.5-7B & 4-bit NF4 & 35.6 & 5.74 & 49.1 & 281.4 & 344 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+% LLM7B:RUNTIME:END
+
+% LLM7B:TAXONOMY:BEGIN
+\paragraph{Failure Taxonomy.} Final-attempt failures, as a share of each model's $N$: Qwen2.5-1.5B (94.2\% final pass, 5.8\% fallback): Missing subgroup caveat (5.8\%). Qwen2.5-7B (100.0\% final pass, 0.0\% fallback): no final-attempt failures.
+% LLM7B:TAXONOMY:END
 
 \begin{table}[htbp]
 \centering
@@ -500,14 +533,18 @@ The unlabeled Mahalanobis detector achieves 0.94 AUC, detecting shift at 25\% co
     \item \textbf{Attribution power}: Wald significance fractions vary across seeds: Age (100\%), Waist (100\%), SBP (85\%), Moderate Activity (35\%), DBP (30\%). Limited power with the 50\% training set used for Hessian computation.
     \item \textbf{Single dataset / single-cycle validation}: Results on NHANES 2017--2018 only; external validation needed. Multi-cycle temporal validation (Train 2013--2016 $\to$ Calibrate 2017--2018 $\to$ Test 2021--2023) not performed (additional NHANES cycles unavailable).
     \item \textbf{Diabetes definition}: Self-reported physician diagnosis (DIQ010) misses undiagnosed cases and conflates T1D/T2D.
-    \item \textbf{LLM evaluation}: Loop 2 verification run only on 1 seed (seed 3, 86 patients) with Qwen2.5-1.5B-Instruct. Results may not generalize to other seeds or larger models (7B/8B). Code is available for future execution on RTX 4070 (8.6 GB VRAM, supports 4-bit quantized 7B/8B models).
+    % LLM7B:LIMITATIONS:BEGIN
+\item \textbf{LLM evaluation}: Loop 2 verification is run on 1 seed (seed 3) for Qwen2.5-1.5B and 4-bit Qwen2.5-7B-Instruct. Both models cover all 86 high-risk patients with $M=3$. Results may not generalise to other seeds, and no 8B model was evaluated (no weights were available); the framework is model-agnostic and the benchmark script accepts any Hugging Face causal LM that fits in 4-bit on the available GPU.
+% LLM7B:LIMITATIONS:END
     \item \textbf{Drift detection}: MMD detection AUCs are based on a simplified RBF kernel implementation; a more rigorous implementation with permutation testing would strengthen claims.
     \item \textbf{Lab-verified target}: NHANES 2017--2018 lab variables (HbA1c, FPG) were not available in the processed cohort file; target definition sensitivity analysis requires raw XPT files.
 \end{itemize}
 
 \section{Conclusion}
 
-We presented a conformal-grounded agentic explanation framework with all metrics verified via a 20-seed experimental pipeline. Key results (mean $\pm$ 95\% CI across 20 seeds): LR AUC 0.770 [0.742, 0.798] (no HbA1c/glucose); overall conformal test coverage 91.3\% [88.7\%, 94.0\%] (target 90\%); worst-subgroup test coverage 84.4\% [76.2\%, 92.6\%]; max coverage gap 11.1\%; counterfactual target reach 100.0\% via iterative tier escalation and radius relaxation (mean 55 high-risk patients per seed; Tier 1: 56.1\%, Tier 2: 43.9\%, Tier 3: 0.0\%; radius: Tier 1 $1.0\times$: 35.6\%, Tier 1 $1.5\times$: 20.2\%, Tier 2 $1.0\times$: 23.3\%, Tier 2 $1.5\times$: 20.2\%, Tier 1 $2.0\times$: 0.3\%, Tier 2 $2.0\times$: 0.5\%, Tier 3: 0.0\%); ellipsoid containment 100.0\%; mean $\|\boldsymbol{\delta}\|_2 = 1.38$ SD; Wald attribution identifies Age (50\% subgroup significance) and Waist (10.8\%) as significant drivers; validation ECE 3.9\% [2.1\%, 5.8\%], with zero abstentions triggered. Conformal baselines (Marginal, Mondrian, Complete Pooling, Standard EB) benchmarked across 20 seeds: EB-MinCov achieves best worst-subgroup coverage (84.4\% vs. 81.1\% for Mondrian). Nonlinear models (XGBoost, LightGBM) achieve AUC 0.785/0.788 with 100\% counterfactual reach. LLM Loop 2 verification on 1 seed (Qwen2.5-1.5B-Instruct, 86 patients) achieves 94.2\% final pass rate (67.4\% $\to$ 91.9\% $\to$ 94.2\%, M=3). Unlabeled drift detection (Mahalanobis AUC 0.94) detects shift earlier than labeled audit. The framework provides distribution-free conformal guarantees, actionable counterfactuals with valid binary state transitions, inference-valid calibrated attributions, and deployable auditing -- all from a single reproducible pipeline with a 4-way data split (50\%/15\%/15\%/20\%) and 20 stratified seeds. Only NHANES 2017--2018 is available; multi-cycle temporal validation requires additional NHANES cycles.
+We presented a conformal-grounded agentic explanation framework with all metrics verified via a 20-seed experimental pipeline. Key results (mean $\pm$ 95\% CI across 20 seeds): LR AUC 0.770 [0.742, 0.798] (no HbA1c/glucose); overall conformal test coverage 91.3\% [88.7\%, 94.0\%] (target 90\%); worst-subgroup test coverage 84.4\% [76.2\%, 92.6\%]; max coverage gap 11.1\%; counterfactual target reach 100.0\% via iterative tier escalation and radius relaxation (mean 55 high-risk patients per seed; Tier 1: 56.1\%, Tier 2: 43.9\%, Tier 3: 0.0\%; radius: Tier 1 $1.0\times$: 35.6\%, Tier 1 $1.5\times$: 20.2\%, Tier 2 $1.0\times$: 23.3\%, Tier 2 $1.5\times$: 20.2\%, Tier 1 $2.0\times$: 0.3\%, Tier 2 $2.0\times$: 0.5\%, Tier 3: 0.0\%); ellipsoid containment 100.0\%; mean $\|\boldsymbol{\delta}\|_2 = 1.38$ SD; Wald attribution identifies Age (50\% subgroup significance) and Waist (10.8\%) as significant drivers; validation ECE 3.9\% [2.1\%, 5.8\%], with zero abstentions triggered. Conformal baselines (Marginal, Mondrian, Complete Pooling, Standard EB) benchmarked across 20 seeds: EB-MinCov achieves best worst-subgroup coverage (84.4\% vs. 81.1\% for Mondrian). Nonlinear models (XGBoost, LightGBM) achieve AUC 0.785/0.788 with 100\% counterfactual reach. % LLM7B:CONCLUSION:BEGIN
+LLM Loop 2 verification on 1 seed (86 patients) achieves 94.2\% final pass for Qwen2.5-1.5B-Instruct (67.4\% $\to$ 91.9\% $\to$ 94.2\%, $M=3$) and 100.0\% for 4-bit Qwen2.5-7B-Instruct (33.7\% $\to$ 87.2\% $\to$ 100.0\%, $M=3$; fallback 0.0\%).
+% LLM7B:CONCLUSION:END Unlabeled drift detection (Mahalanobis AUC 0.94) detects shift earlier than labeled audit. The framework provides distribution-free conformal guarantees, actionable counterfactuals with valid binary state transitions, inference-valid calibrated attributions, and deployable auditing -- all from a single reproducible pipeline with a 4-way data split (50\%/15\%/15\%/20\%) and 20 stratified seeds. Only NHANES 2017--2018 is available; multi-cycle temporal validation requires additional NHANES cycles.
 
 \appendix
 
@@ -557,6 +594,10 @@ The verifier checks are deterministic functions of the narrative text and the ev
 \section*{Reproducibility}
 
 All code and data processing scripts are available at \texttt{reproducibility\_package/}. The complete verified experimental pipeline runs with \texttt{python src/run\_full\_verified\_pipeline.py} (20-seed conformal baselines, nonlinear models, drift stress test, counterfactual baselines, perturbation stability) and \texttt{python src/run\_llm\_eval\_fixed.py} (1-seed LLM Loop 2 verification on 86 high-risk patients with Qwen2.5-1.5B-Instruct). All tables, figures, and artifacts are generated in \texttt{results/} with \texttt{metrics\_verified.json} and \texttt{llm\_traces.jsonl} as primary outputs. Random seeds 0--19 for 20-seed stability, seed 3 for LLM evaluation. The 4-way split (50\%/15\%/15\%/20\%) ensures no leakage between Platt calibration, conformal calibration, and audit estimation.
+
+% LLM7B:REPRO:BEGIN
+The 7B benchmark is reproduced with \texttt{python src/run\_llm\_7b\_benchmark.py} (4-bit NF4, GPU-0 only, resumable; traces stream to \texttt{results/llm\_traces\_7b.jsonl}) and integrated with \texttt{python src/integrate\_7b\_results.py}. Peak VRAM, load time and per-call latency are recorded in \texttt{metrics\_verified.json} under \texttt{llm\_evaluation\_7b}.
+% LLM7B:REPRO:END
 
 \bibliographystyle{plain}
 \bibliography{references_final}

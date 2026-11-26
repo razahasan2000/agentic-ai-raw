@@ -183,6 +183,8 @@ def build_table8(m15, m7, n15, n7, partial, m7_meta):
         r"Qwen2.5-1.5B and 4-bit Qwen2.5-7B use identical prompts, verifier, token "
         r"budgets and $M=3$ repair; values are recomputed from the raw trace files. "
     )
+    header += (r"Bold marks the higher final pass rate of the two models for that "
+               r"variant. ")
     if partial:
         header += (rf"Scope is partial: $N={n7}$ patients for both models "
                    rf"(matched subset), not the full 86. ")
@@ -410,9 +412,9 @@ def main(argv=None):
         r" high-risk patients ($p > 0.5$) from seed 3: (i) Unconstrained LLM (no "
         r"tools, no verifier), (ii) Single-Shot Schema LLM (no Loop 1, no Loop 2), "
         r"(iii) Loop 1 + Schema LLM (no Loop 2), (iv) Full Agentic Loop (Loop 1 + "
-        r"Loop 2 Verifier Repair, $M=3$). We tested Qwen2.5-1.5B-Instruct and "
-        r"Qwen2.5-7B-Instruct, both 4-bit NF4 quantised on an 8.6 GB RTX 4070 Laptop "
-        r"GPU, with identical prompts, verifier, token budgets and decoding. "
+        r"Loop 2 Verifier Repair, $M=3$). We tested Qwen2.5-1.5B-Instruct in FP16 "
+        r"and Qwen2.5-7B-Instruct in 4-bit NF4 on an 8.6 GB RTX 4070 Laptop GPU, "
+        r"with identical prompts, verifier, token budgets and decoding. "
         r"Table~\ref{tab:multillm} summarizes results."
     )
 
@@ -425,9 +427,11 @@ def main(argv=None):
         rf"{pct(f15['fallback_pct'])}). Qwen2.5-7B goes " + pct(f7["att1_pct"]) +
         r" $\to$ " + pct(f7["att2_pct"]) + r" $\to$ " + pct(f7["att3_pct"]) +
         rf" (repair gain +{f7['final_pct'] - f7['att1_pct']:.1f}~pp; fallback "
-        rf"{pct(f7['fallback_pct'])}). The Verifier Agent therefore repairs errors "
-        r"for both model sizes, and the larger model does not remove the need for "
-        r"verification."
+        rf"{pct(f7['fallback_pct'])}). The larger model starts from a "
+        rf"{'lower' if f7['att1_pct'] < f15['att1_pct'] - 1e-9 else ('higher' if f7['att1_pct'] > f15['att1_pct'] + 1e-9 else 'comparable')} Attempt-1 pass "
+        rf"rate ({pct(f7['att1_pct'])} vs {pct(f15['att1_pct'])}), so model scale "
+        r"does not remove the need for verification; the Verifier Agent repairs "
+        r"errors for both model sizes."
     )
 
     def tax_line(counts, n):
@@ -438,7 +442,7 @@ def main(argv=None):
             c = counts.get(key, 0)
             if c:
                 parts.append(f"{label} ({100.0 * c / n:.1f}\\%)")
-        return ", ".join(parts) if parts else "no failed checks"
+        return ", ".join(parts) if parts else "no final-attempt failures"
 
     taxonomy = (
         r"\paragraph{Failure Taxonomy.} Final-attempt failures, as a share of each "

@@ -93,7 +93,8 @@ def main():
     ax.axhline(100, color="grey", linestyle=":", linewidth=0.8)
     ax.grid(axis="y", alpha=0.3)
     ax.set_axisbelow(True)
-    ax.legend(frameon=False, loc="lower right", fontsize=9)
+    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.13),
+              ncol=len(series), fontsize=9)
     ax.set_title("Loop 2 verifier repair: cumulative pass rate", fontsize=11)
     fig.tight_layout()
 
