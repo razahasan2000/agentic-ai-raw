@@ -166,7 +166,7 @@ for feat in BINARY_FEATURES:
 
 for feat in CATEGORICAL_FEATURES:
     if feat in cohort.columns:
-        dummies = pd.get_dummies(cohort[feat], prefix=f'z_{feat}')
+        dummies = pd.get_dummies(cohort[feat], prefix=f'z_{feat}', drop_first=True)
         for c in dummies.columns:
             embeddings[c] = dummies[c].astype(float)
             z_cols.append(c)
@@ -339,7 +339,7 @@ TIER_DEFINITIONS = {
     3: {'name': 'Behavioral + Anthropometric + Clinical', 'continuous': ['z_BMI', 'z_Waist_cm', 'z_SBP', 'z_DBP'], 'binary': ['z_Moderate_Activity', 'z_Vigorous_Activity', 'z_Current_Smoker', 'z_Current_Drinker']},
 }
 
-FROZEN_FEATURES = ['z_RIDAGEYR', 'z_Gender_Female', 'z_Gender_Male', 'z_INDFMPIR']
+FROZEN_FEATURES = ['z_RIDAGEYR', 'z_Gender_Male', 'z_INDFMPIR']
 
 def mahalanobis(z, mu, prec):
     diff = z - mu
@@ -457,9 +457,18 @@ def run_counterfactuals(X_test, y_test, sg_test, sid_test, w_cal, b_cal, subgrou
 def compute_wald_attribution(X, y, w, b, z_cols):
     p = expit(X @ w + b)
     W = p * (1 - p)
-    H = X.T @ (W[:, np.newaxis] * X)
+    # Balanced sample weights
+    n_pos = y.sum()
+    n_neg = len(y) - n_pos
+    w_bal = np.where(y == 1, len(y) / (2 * n_pos), len(y) / (2 * n_neg))
+    # Penalized weighted Hessian (L2 with C=1.0 -> lambda=1.0)
+    lam = 1.0
+    H = X.T @ (w_bal[:, np.newaxis] * W[:, np.newaxis] * X) + lam * np.eye(X.shape[1])
+    # Sandwich: H^{-1} G H^{-1}
+    G = X.T @ (w_bal[:, np.newaxis]**2 * W[:, np.newaxis] * X)
     try:
-        cov = np.linalg.inv(H)
+        H_inv = np.linalg.inv(H)
+        cov = H_inv @ G @ H_inv
         se = np.sqrt(np.diag(cov))
     except:
         se = np.ones(len(w))
@@ -632,7 +641,7 @@ def run_drift_stress_test(X_conf_audit, y_conf_audit, sg_conf_audit, w_cal, b_ca
             # Corrupt anthropometric features for all subgroups
             n_corrupt = int(len(X_corrupted) * sev)
             corrupt_idx = np.random.choice(len(X_corrupted), n_corrupt, replace=False)
-            X_corrupted[corrupt_idx][:, anthro_idx] = 0.0  # Set to reference (0 in z-space)
+            X_corrupted[np.ix_(corrupt_idx, anthro_idx)] += 3.0  # +3 SD anthropometric shift
         
         p_corrupted = predict_calibrated(X_corrupted, w_cal, b_cal)
         scores_corrupted = np.where(y_conf_audit == 1, 1 - p_corrupted, p_corrupted)
@@ -965,7 +974,7 @@ if HAS_TRANSFORMERS and torch.cuda.is_available():
             prompt = "Patient has 80% diabetes risk. Suggest lifestyle changes."
             inputs = tokenizer(f"User: {prompt}\nAssistant:", return_tensors="pt").to("cuda")
             with torch.no_grad():
-                out = model.generate(**inputs, max_new_tokens=50, temperature=0.0, pad_token_id=tokenizer.eos_token_id)
+                out = model.generate(**inputs, max_new_tokens=50, do_sample=False, pad_token_id=tokenizer.eos_token_id)
             response = tokenizer.decode(out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
             print(f"  Loaded {model_name} successfully")
             del model
@@ -1009,7 +1018,7 @@ if HAS_TRANSFORMERS and torch.cuda.is_available():
                     'counterfactual': {
                         'tier': tier_used,
                         'radius_mult': radius_mult,
-                        'changes': {k: round(v, 2) for k, v in delta.items() if abs(v) > 1e-3},
+                        'changes': {z_cols[i]: round(float(delta[i]), 2) for i in range(len(z_cols)) if abs(delta[i]) > 1e-3},
                         'inside_ellipsoid': inside
                     },
                     'subgroup_coverage': round(val_cov_per_sg.get(sg, 0) * 100, 1),
@@ -1022,7 +1031,7 @@ if HAS_TRANSFORMERS and torch.cuda.is_available():
                 import time
                 start = time.time()
                 with torch.no_grad():
-                    out = model.generate(**inputs, max_new_tokens=100, temperature=0.0, pad_token_id=tokenizer.eos_token_id)
+                    out = model.generate(**inputs, max_new_tokens=100, do_sample=False, pad_token_id=tokenizer.eos_token_id)
                 latency = time.time() - start
                 response = tokenizer.decode(out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
                 
@@ -1054,7 +1063,7 @@ if HAS_TRANSFORMERS and torch.cuda.is_available():
                 inputs = tokenizer(f"User: {schema_prompt}\nAssistant:", return_tensors="pt").to("cuda")
                 start = time.time()
                 with torch.no_grad():
-                    out = model.generate(**inputs, max_new_tokens=150, temperature=0.0, pad_token_id=tokenizer.eos_token_id)
+                    out = model.generate(**inputs, max_new_tokens=150, do_sample=False, pad_token_id=tokenizer.eos_token_id)
                 latency = time.time() - start
                 response = tokenizer.decode(out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
                 
@@ -1077,7 +1086,7 @@ if HAS_TRANSFORMERS and torch.cuda.is_available():
                 inputs = tokenizer(f"User: {loop1_prompt}\nAssistant:", return_tensors="pt").to("cuda")
                 start = time.time()
                 with torch.no_grad():
-                    out = model.generate(**inputs, max_new_tokens=150, temperature=0.0, pad_token_id=tokenizer.eos_token_id)
+                    out = model.generate(**inputs, max_new_tokens=150, do_sample=False, pad_token_id=tokenizer.eos_token_id)
                 latency = time.time() - start
                 response = tokenizer.decode(out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
                 
@@ -1108,7 +1117,7 @@ if HAS_TRANSFORMERS and torch.cuda.is_available():
                     inputs = tokenizer(f"User: {repair_prompt}\nAssistant:", return_tensors="pt").to("cuda")
                     start = time.time()
                     with torch.no_grad():
-                        out = model.generate(**inputs, max_new_tokens=150, temperature=0.0, pad_token_id=tokenizer.eos_token_id)
+                        out = model.generate(**inputs, max_new_tokens=150, do_sample=False, pad_token_id=tokenizer.eos_token_id)
                     latency = time.time() - start
                     response_current = tokenizer.decode(out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
                     checks = verifier_check(response_current, evidence)

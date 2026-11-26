@@ -114,7 +114,7 @@ Each check $v_i$ is a decidable predicate: (1) regex extraction of risk percenta
 
 \subsection{Wald Standard Error Derivation}
 
-The calibrated model is logistic regression: $\text{logit}(p(\mathbf z)) = \mathbf w_{\text{cal}}^\top \mathbf z + b_{\text{cal}}$. The Hessian of the log-likelihood is $\mathbf X^\top \mathbf W \mathbf X$ with $\mathbf W_{ii}=p_i(1-p_i)$, accounting for L2 regularization ($\lambda$), balanced sample weights ($\mathbf W_{\text{bal}}$), and Platt scaling ($A$). Sandwich SEs: $\widehat{\mathrm{SE}}(w_j) = \sqrt{(\mathbf X^\top \mathbf W \mathbf X + \lambda \mathbf I)^{-1}_{jj}}$. Two-sided p-value: $2(1-\Phi(|w_j|/\widehat{\mathrm{SE}}_j))$. BH correction at FDR 10\% per subgroup.
+The calibrated model is logistic regression: $\text{logit}(p(\mathbf z)) = \mathbf w_{\text{cal}}^\top \mathbf z + b_{\text{cal}}$. The Hessian of the log-likelihood is $\mathbf X^\top \mathbf W \mathbf X$ with $\mathbf W_{ii}=p_i(1-p_i)$, accounting for L2 regularization ($\lambda$), balanced sample weights ($\mathbf W_{\text{bal}}$), and Platt scaling ($A$). Sandwich SEs: $\mathbf H = \mathbf X^\top \mathbf W_{\text{bal}} \mathbf W \mathbf X + \lambda \mathbf I$, $\mathbf G = \mathbf X^\top \mathbf W_{\text{bal}}^2 \mathbf W \mathbf X$, $\widehat{\mathrm{Cov}} = \mathbf H^{-1} \mathbf G \mathbf H^{-1}$, $\widehat{\mathrm{SE}}(w_j) = \sqrt{\widehat{\mathrm{Cov}}_{jj}}$. Two-sided p-value: $2(1-\Phi(|w_j|/\widehat{\mathrm{SE}}_j))$. BH correction at FDR 10\% per subgroup.
 
 \section{Supplementary Note S2: Cohort Construction, Feature Dictionary, and Leakage Audit}
 \label{sec:cohort}
@@ -159,15 +159,15 @@ NHANES 2017--2018: 5,533 adults, 18.6\% diabetes prevalence. Race/ethnicity subg
 \centering
 \caption{Multi-seed conformal coverage comparison (20 seeds, Mean $\pm$ 95\% CI).}
 \label{tab:full_conformal}
-\resizebox{\linewidth}{!}{\begin{tabular}{lcccccc}
+\resizebox{\linewidth}{!}{\begin{tabular}{lcccc}
 \toprule
-Method & Overall Cov. & Worst Subgroup & Max Gap & Set Size & Singleton \% \\
+Method & Overall Cov. & Worst Subgroup & Max Gap \\
 \midrule
-EB-MinCov (Ours) & \textbf{91.3\%} [88.7, 94.0] & \textbf{84.4\%} [76.2, 92.6] & 11.1\% [3.7, 18.5] & 1.31 & 69.5\% \\
-Marginal Split & 90.1\% [87.3, 92.8] & 82.3\% [75.1, 89.5] & 12.4\% [4.2, 20.6] & 1.29 & 71.2\% \\
-Mondrian (Unshrunk) & 89.4\% [86.6, 92.1] & 81.1\% [73.8, 88.4] & 14.2\% [5.1, 23.3] & 1.35 & 65.8\% \\
-Complete Pooling & 90.1\% [87.3, 92.8] & 82.3\% [75.1, 89.5] & 12.4\% [4.2, 20.6] & 1.30 & 70.1\% \\
-Standard EB (No Guardrail) & 89.4\% [86.9, 91.8] & 80.9\% [73.5, 88.3] & 13.8\% [5.0, 22.6] & 1.32 & 68.9\% \\
+EB-MinCov (Ours) & \textbf{91.3\%} [88.7, 94.0] & \textbf{84.4\%} [76.2, 92.6] & 11.1\% [3.7, 18.5] \\
+Marginal Split & 90.1\% [87.3, 92.8] & 82.3\% [75.1, 89.5] & 12.4\% [4.2, 20.6] \\
+Mondrian (Unshrunk) & 89.4\% [86.6, 92.1] & 81.1\% [73.8, 88.4] & 14.2\% [5.1, 23.3] \\
+Complete Pooling & 90.1\% [87.3, 92.8] & 82.3\% [75.1, 89.5] & 12.4\% [4.2, 20.6] \\
+Standard EB (No Guardrail) & 89.4\% [86.9, 91.8] & 80.9\% [73.5, 88.3] & 13.8\% [5.0, 22.6] \\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -204,19 +204,18 @@ Both metrics reported uniformly: (a) Enforced-Radius Containment (at solver's ac
 \toprule
 Feature & Sig. Fraction (seeds) & Subgroup Sig. (mean) & Mean Wald (global) \\
 \midrule
-Age & 100.0\% & 50.0\% & 9.81--12.31 \\
-Waist circumference & 100.0\% & 10.8\% & 2.45--4.50 \\
-SBP & 85.0\% & 1.7\% & 2.31--4.40 \\
-DBP & 30.0\% & 0.0\% & 1.45--2.84 \\
-Moderate Activity & 35.0\% & 0.0\% & 1.24--3.19 \\
-BMI & 5.0\% & 0.0\% & 1.11--2.34 \\
-Current Drinker & 10.0\% & 0.0\% & 0.62--2.23 \\
-Income ratio & 0.0\% & 0.0\% & 0.06--0.54 \\
-Vigorous Activity & 0.0\% & 0.0\% & 0.05--1.37 \\
-Current Smoker & 0.0\% & 0.0\% & $\approx$0 \\
-Former Smoker & 0.0\% & 0.0\% & $\approx$0 \\
-Gender (Female) & 0.0\% & 0.0\% & $\approx$0 \\
-Gender (Male) & 0.0\% & 0.0\% & $\approx$0 \\
+Age & 47.5\% & 0.0\% & 3.10 \\
+Waist circumference & 2.5\% & 0.0\% & 1.45 \\
+SBP & 0.0\% & 0.0\% & 0.86 \\
+DBP & 0.0\% & 0.0\% & 0.65 \\
+Moderate Activity & 0.0\% & 0.0\% & 0.81 \\
+BMI & 0.0\% & 0.0\% & 0.37 \\
+Current Drinker & 0.0\% & 0.0\% & 0.29 \\
+Income ratio & 0.0\% & 0.0\% & 0.15 \\
+Vigorous Activity & 0.0\% & 0.0\% & 0.28 \\
+Current Smoker & 0.0\% & 0.0\% & 0.08 \\
+Former Smoker & 0.0\% & 0.0\% & 0.09 \\
+Gender (Male) & 0.0\% & 0.0\% & 0.54 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -250,8 +249,7 @@ Labeled Audit Cov. Drop & 0.0\% & 1.2\% & 3.8\% & 7.5\% & 14.2\% \\
 Labeled Abstain Trigger & No & No & No & Yes & Yes \\
 MMD Detection AUC & 0.50 & 0.74 & 0.91 & 0.98 & 0.99 \\
 KS Detection AUC & 0.50 & 0.69 & 0.87 & 0.95 & 0.98 \\
-Mahalanobis Exceedance (raw) & 0.10 & 0.25 & 0.48 & 0.81 & 1.03 \\
-Mahalanobis Exceedance (excess) & 0.00 & 0.15 & 0.38 & 0.71 & 0.93 \\
+Mahalanobis Exceedance & 0.10 & 0.32 & 0.54 & 0.75 & 0.97 \\
 Unlabeled Abstain Rate & 0.00 & 0.09 & 0.33 & 0.66 & 0.94 \\
 \bottomrule
 \end{tabular}

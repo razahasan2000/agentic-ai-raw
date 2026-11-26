@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-26T09:03:58.672773",
+  "generated": "2026-11-26T19:55:45.647864",
   "scope": {
     "partial": false,
     "n_patients_7b": 86,
@@ -116,10 +116,10 @@
     "7B": {}
   },
   "runtime_7b": {
-    "model_load_s": 35.63,
-    "evaluation_s": 13104.02,
-    "evaluation_min": 218.4,
-    "records_written_this_run": 344,
+    "model_load_s": 49.71,
+    "evaluation_s": 0.0,
+    "evaluation_min": 0.0,
+    "records_written_this_run": 0,
     "duplicates_removed_on_resume": 0
   },
   "vram_7b": {
@@ -137,48 +137,7 @@
       "free_GB": 1.663,
       "total_GB": 8.585
     },
-    "peak_allocated_GB": 5.744,
-    "samples": [
-      {
-        "patient": 95448,
-        "allocated_GB": 5.57,
-        "reserved_GB": 5.889,
-        "peak_allocated_GB": 5.744,
-        "free_GB": 1.478,
-        "total_GB": 8.585
-      },
-      {
-        "patient": 96335,
-        "allocated_GB": 5.57,
-        "reserved_GB": 5.889,
-        "peak_allocated_GB": 5.744,
-        "free_GB": 1.478,
-        "total_GB": 8.585
-      },
-      {
-        "patient": 101396,
-        "allocated_GB": 5.57,
-        "reserved_GB": 5.889,
-        "peak_allocated_GB": 5.744,
-        "free_GB": 1.478,
-        "total_GB": 8.585
-      },
-      {
-        "patient": 94464,
-        "allocated_GB": 5.57,
-        "reserved_GB": 5.889,
-        "peak_allocated_GB": 5.744,
-        "free_GB": 1.478,
-        "total_GB": 8.585
-      },
-      {
-        "patient": 102032,
-        "allocated_GB": 5.57,
-        "reserved_GB": 5.889,
-        "peak_allocated_GB": 5.744,
-        "free_GB": 1.478,
-        "total_GB": 8.585
-      }
-    ]
+    "peak_allocated_GB": 5.56,
+    "samples": []
   }
 }
