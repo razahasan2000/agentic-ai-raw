@@ -1,0 +1,5 @@
+variant,reach_rate,ellipsoid_containment,attempt_1_pass,attempt_2_pass,attempt_3_pass,final_pass,fallback_rate,latency_sec
+Unconstrained,0.0%,0.0%,0.0%,N/A,N/A,0.0%,0.0%,2.1
+Schema Prompted,68.0%,68.0%,58.0%,N/A,N/A,58.0%,0.0%,3.4
+Loop1 Schema,100.0%,100.0%,72.0%,N/A,N/A,72.0%,0.0%,8.7
+Full Agentic,100.0%,100.0%,80.0%,0.85,0.88,88.0%,12.0%,14.3

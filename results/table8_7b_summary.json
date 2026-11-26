@@ -1,0 +1,184 @@
+{
+  "generated": "2026-11-26T09:03:58.672773",
+  "scope": {
+    "partial": false,
+    "n_patients_7b": 86,
+    "n_patients_1p5b_matched": 86,
+    "n_patients_1p5b_full": 86,
+    "max_attempts": 3,
+    "quantization": "4-bit NF4, double-quant, fp16 compute",
+    "model": "Qwen/Qwen2.5-7B-Instruct"
+  },
+  "models": {
+    "Qwen2.5-1.5B-Instruct": {
+      "unconstrained": {
+        "n": 86,
+        "passed": 0,
+        "final_pct": 0.0,
+        "fallback_pct": 100.0,
+        "att1_pct": 0.0,
+        "att2_pct": 0.0,
+        "att3_pct": 0.0,
+        "lat_mean": 3.338432877562767,
+        "lat_p95": 3.80842661857605
+      },
+      "schema_prompted": {
+        "n": 86,
+        "passed": 60,
+        "final_pct": 69.76744186046511,
+        "fallback_pct": 30.232558139534884,
+        "att1_pct": 69.76744186046511,
+        "att2_pct": 69.76744186046511,
+        "att3_pct": 69.76744186046511,
+        "lat_mean": 4.965745255004528,
+        "lat_p95": 5.564230918884277
+      },
+      "loop1_schema": {
+        "n": 86,
+        "passed": 58,
+        "final_pct": 67.44186046511628,
+        "fallback_pct": 32.55813953488372,
+        "att1_pct": 67.44186046511628,
+        "att2_pct": 67.44186046511628,
+        "att3_pct": 67.44186046511628,
+        "lat_mean": 4.9413235381592155,
+        "lat_p95": 5.494021415710449
+      },
+      "full_agentic": {
+        "n": 86,
+        "passed": 81,
+        "final_pct": 94.18604651162791,
+        "fallback_pct": 5.813953488372093,
+        "att1_pct": 67.44186046511628,
+        "att2_pct": 91.86046511627907,
+        "att3_pct": 94.18604651162791,
+        "lat_mean": 4.9493958090626915,
+        "lat_p95": 5.532296657562256
+      }
+    },
+    "Qwen2.5-7B-Instruct-4bit": {
+      "unconstrained": {
+        "n": 86,
+        "passed": 0,
+        "final_pct": 0.0,
+        "fallback_pct": 100.0,
+        "att1_pct": 0.0,
+        "att2_pct": 0.0,
+        "att3_pct": 0.0,
+        "lat_mean": 29.34482558139535,
+        "lat_p95": 30.616
+      },
+      "schema_prompted": {
+        "n": 86,
+        "passed": 46,
+        "final_pct": 53.48837209302326,
+        "fallback_pct": 46.51162790697674,
+        "att1_pct": 53.48837209302326,
+        "att2_pct": 53.48837209302326,
+        "att3_pct": 53.48837209302326,
+        "lat_mean": 44.17360465116279,
+        "lat_p95": 45.869
+      },
+      "loop1_schema": {
+        "n": 86,
+        "passed": 29,
+        "final_pct": 33.72093023255814,
+        "fallback_pct": 66.27906976744185,
+        "att1_pct": 33.72093023255814,
+        "att2_pct": 33.72093023255814,
+        "att3_pct": 33.72093023255814,
+        "lat_mean": 43.95251162790698,
+        "lat_p95": 45.92
+      },
+      "full_agentic": {
+        "n": 86,
+        "passed": 86,
+        "final_pct": 100.0,
+        "fallback_pct": 0.0,
+        "att1_pct": 33.72093023255814,
+        "att2_pct": 87.20930232558139,
+        "att3_pct": 100.0,
+        "lat_mean": 78.83286046511628,
+        "lat_p95": 136.222
+      }
+    }
+  },
+  "attempt_progression_7b": {
+    "att1_pct": 33.72,
+    "att2_pct": 87.21,
+    "att3_pct": 100.0,
+    "fallback_pct": 0.0
+  },
+  "failure_taxonomy": {
+    "1.5B": {
+      "subgroup_stated": 5
+    },
+    "7B": {}
+  },
+  "runtime_7b": {
+    "model_load_s": 35.63,
+    "evaluation_s": 13104.02,
+    "evaluation_min": 218.4,
+    "records_written_this_run": 344,
+    "duplicates_removed_on_resume": 0
+  },
+  "vram_7b": {
+    "before_load": {
+      "allocated_GB": 0.0,
+      "reserved_GB": 0.0,
+      "peak_allocated_GB": 0.0,
+      "free_GB": 7.411,
+      "total_GB": 8.585
+    },
+    "after_load": {
+      "allocated_GB": 5.56,
+      "reserved_GB": 5.727,
+      "peak_allocated_GB": 5.689,
+      "free_GB": 1.663,
+      "total_GB": 8.585
+    },
+    "peak_allocated_GB": 5.744,
+    "samples": [
+      {
+        "patient": 95448,
+        "allocated_GB": 5.57,
+        "reserved_GB": 5.889,
+        "peak_allocated_GB": 5.744,
+        "free_GB": 1.478,
+        "total_GB": 8.585
+      },
+      {
+        "patient": 96335,
+        "allocated_GB": 5.57,
+        "reserved_GB": 5.889,
+        "peak_allocated_GB": 5.744,
+        "free_GB": 1.478,
+        "total_GB": 8.585
+      },
+      {
+        "patient": 101396,
+        "allocated_GB": 5.57,
+        "reserved_GB": 5.889,
+        "peak_allocated_GB": 5.744,
+        "free_GB": 1.478,
+        "total_GB": 8.585
+      },
+      {
+        "patient": 94464,
+        "allocated_GB": 5.57,
+        "reserved_GB": 5.889,
+        "peak_allocated_GB": 5.744,
+        "free_GB": 1.478,
+        "total_GB": 8.585
+      },
+      {
+        "patient": 102032,
+        "allocated_GB": 5.57,
+        "reserved_GB": 5.889,
+        "peak_allocated_GB": 5.744,
+        "free_GB": 1.478,
+        "total_GB": 8.585
+      }
+    ]
+  }
+}

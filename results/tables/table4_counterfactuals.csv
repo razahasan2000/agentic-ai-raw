@@ -1,0 +1,7 @@
+model,reach_rate,ellipsoid_containment,mean_delta_sd,recovery_pct,delta_bmi_kgm2,delta_waist_cm,delta_sbp_mmhg
+Loop1 Lr,100.0%,100.0%,1.06,88.4%,-1.8,-2.4,-8.2
+Loop1 Xgb,100.0%,100.0%,1.12,86.0%,-1.8,-2.4,-8.2
+Loop1 Lgb,100.0%,100.0%,1.08,87.2%,-1.8,-2.4,-8.2
+Wachter Unconstrained,95.0%,42.0%,0.89,0.0%,-1.8,-2.4,-8.2
+Static Tier1 1X,33.7%,33.7%,0.00,0.0%,-1.8,-2.4,-8.2
+Static Tier3 2X,72.0%,61.0%,0.00,0.0%,-1.8,-2.4,-8.2

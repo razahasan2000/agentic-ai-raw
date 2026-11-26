@@ -1,0 +1,84 @@
+
+\begin{table}[htbp]
+\centering
+\caption{NHANES 2017-2018 Diabetes Cohort Characteristics}
+\label{tab:cohort}
+\begin{tabular}{lcccc}
+\toprule
+Subgroup & N & Diabetes \% & HbA1c Mean & BMI Mean \\
+\midrule
+\textbf{Overall} & 5,533 & 18.6 & 5.77 & 26.6 \\
+\midrule
+\textbf{Age Group} & & & & \\
+18-29 & 987 & 1.6 & 5.3 & 25.1 \\
+30-39 & 807 & 5.5 & 5.4 & 26.0 \\
+40-49 & 782 & 15.3 & 5.7 & 27.2 \\
+50-59 & 940 & 22.9 & 5.9 & 27.8 \\
+60-69 & 1,000 & 32.1 & 6.1 & 28.5 \\
+70-79 & 882 & 35.3 & 6.2 & 27.9 \\
+\midrule
+\textbf{Race/Ethnicity} & & & & \\
+White & 1,898 & 16.8 & 5.7 & 26.5 \\
+Black & 1,283 & 20.0 & 6.0 & 27.8 \\
+Mexican American & 752 & 20.3 & 5.9 & 28.2 \\
+Asian & 793 & 18.8 & 5.8 & 24.1 \\
+Other Hispanic & 519 & 18.3 & 5.9 & 27.5 \\
+Other & 288 & 19.8 & 5.8 & 26.8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+\begin{table}[htbp]
+\centering
+\caption{Subgroup-Conditional Conformal Coverage (CV+, $\alpha=0.1$)}
+\label{tab:conformal}
+\begin{tabular}{lccc}
+\toprule
+Subgroup & $N_{cal}$ & Quantile $q_{0.9}$ & Test Coverage \\
+\midrule
+Black & 1,283 & 0.625 & 90.4\% \\
+Asian & 793 & 0.489 & 91.3\% \\
+Mexican American & 752 & 0.451 & 89.7\% \\
+White & 1,898 & 0.503 & 91.6\% \\
+Other Hispanic & 519 & 0.505 & 86.0\% \\
+Other & 288 & 0.462 & 94.4\% \\
+\midrule
+Global & 5,533 & 0.523 & 90.5\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+\begin{table}[htbp]
+\centering
+\caption{Ablation Study Summary}
+\label{tab:ablation}
+\begin{tabular}{lccc}
+\toprule
+Component & Setting & Overall Coverage & Worst Subgroup \\
+\midrule
+\textbf{Conformal Method} & & & \\
+CV+ (5-fold) & & 90.5\% & Mexican American (88.4\%) \\
+Single Split & & 90.5\% & Other Hispanic (85.2\%) \\
+Jackknife+ & & 86.4\% & Other Hispanic (74.4\%) \\
+\midrule
+\textbf{Shrinkage} & & & \\
+None & & 90.5\% & Mexican American (88.4\%) \\
+Hierarchical ($\kappa=281$) & & 90.7\% & Mexican American (89.7\%) \\
+\midrule
+\textbf{Ellipsoid} & & & \\
+None & & 98.5\% reach & 0\% inside \\
+1x radius & & 99.6\% reach & 0.7\% inside \\
+2x + 5 restarts & & 100\% reach & 0.7\% inside \\
+\midrule
+\textbf{Subgroup Definition} & & & \\
+Race/Ethnicity (6) & & 90.5\% & Other Hispanic (86.0\%) \\
+Age (7 bins) & & 86.4\% & 18-29 (0.0\%) \\
+BMI (6 bins) & & 89.2\% & Underweight (85.1\%) \\
+Gender (2) & & 89.8\% & Female (88.1\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
