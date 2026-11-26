@@ -273,6 +273,9 @@ White & 385 & 93.0\% [88.9, 97.1] & 92.5\% [88.4, 96.6] & 0.714 \\
 \end{figure}
 
 
+\subsection{Counterfactual Recovery vs. Static and Unconstrained Baselines}
+\label{sec:results_counterfactual}
+
 Across 20 seeds, mean 55 high-risk test patients (calibrated $p>0.5$). QCQP counterfactual optimizer yields 100\% reach target risk $\le$50\%, 100\% ellipsoid containment, mean $\|\boldsymbol\delta\|_2=1.38$ SD. Tier escalation: Tier 1 (behavioral) 56.1\%, Tier 2 (anthropometric) 43.9\%, Tier 3 (clinical) 0.0\%. Radius relaxation: Tier 1 $1.0\times$: 35.6\%, $1.5\times$: 20.2\%, Tier 2 $1.0\times$: 23.3\%, $1.5\times$: 20.2\%, Tier 1 $2.0\times$: 0.3\%, Tier 2 $2.0\times$: 0.5\%, Tier 3: 0.0\%. Mean iterations 1.8 (88.4\% required recovery). Tier 3 (SBP/DBP) never reached in any seed.
 
 \begin{table}[htbp]
@@ -358,12 +361,6 @@ The framework provides distribution-free conformal guarantees (91.3\% overall, 8
 Our framework differs from prior work by combining conformal calibration with hierarchical shrinkage, tiered counterfactual recovery with binary state transitions, inference-valid attribution, and LLM verification with deterministic predicates. See Supplementary Note S8 (\ref{supp-sec:repro}) for a comparative positioning table.
 
 \subsection{Limitations}
-Prevalent vs. incident diabetes; feature exclusion reduces AUC (0.770 vs $\approx$0.95); counterfactual feasibility requires radius relaxation; worst-subgroup coverage below 90\% target; single dataset (NHANES 2017--2018); no multi-cycle temporal validation; LLM evaluation on 1 seed; simplified drift detection. See Section~\ref{sec:limitations_full} in Supplementary for full discussion.
-
-\subsection{Conclusion}
-We presented a conformal-grounded agentic explanation framework with all metrics verified via a 20-seed pipeline. Key results: LR AUC 0.770; conformal coverage 91.3\% [88.7\%, 94.0\%]; worst-subgroup 84.4\% [76.2\%, 92.6\%]; counterfactual reach 100\% with 100\% containment; mean $\|\boldsymbol\delta\|_2=1.38$ SD; Wald attribution with sandwich SEs identifies Age (47.5\% seed significance); validation ECE 3.9\%; LLM Loop 2: 94.2\% (1.5B) and 100.0\% (7B) final pass. All from a single reproducible pipeline with 4-way split and 20 seeds.
-
-\subsection{Limitations}
 \label{sec:limitations_full}
 \begin{itemize}
 \item \textbf{Prevalent vs. incident diabetes}: NHANES provides cross-sectional prevalent diabetes.
@@ -382,4 +379,7 @@ All extended analyses, proofs, and implementation details are in \texttt{supplem
 \bibliographystyle{plain}
 \bibliography{../references_final}
 
+
+\subsection{Conclusion}
+We presented a conformal-grounded agentic explanation framework with all metrics verified via a 20-seed pipeline. Key results: LR AUC 0.770; conformal coverage 91.3\% [88.7\%, 94.0\%]; worst-subgroup 84.4\% [76.2\%, 92.6\%]; counterfactual reach 100\% with 100\% containment; mean $\|\boldsymbol\delta\|_2=1.38$ SD; Wald attribution with sandwich SEs identifies Age (47.5\% seed significance); validation ECE 3.9\%; LLM Loop 2: 94.2\% (1.5B) and 100.0\% (7B) final pass. All from a single reproducible pipeline with 4-way split and 20 seeds.
 \end{document}
