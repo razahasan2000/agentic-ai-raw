@@ -1,0 +1,300 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{xr-hyper}
+\usepackage{natbib}
+\usepackage{geometry}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{framed}
+\usepackage{color}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\geometry{margin=1in}
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+
+% Cross-reference to supplementary
+\externaldocument[supp-]{supplementary}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+
+\title{Conformal-Grounded Agentic Risk Explanation:\\
+Subgroup-Calibrated Counterfactual Recovery and Verified Clinical Narratives}
+\author{Anonymous Authors}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Clinical risk prediction models often operate as opaque scoring engines whose outputs are difficult to justify. Post-hoc explanation methods provide no formal guarantees of correctness, fairness, or stability across patient subgroups. We propose a conformal-grounded agentic explanation framework that couples group-conditional conformal calibration with hierarchical shrinkage, geometric counterfactual search within plausibility ellipsoids, and inference-valid feature attribution via Wald tests on the calibrated logistic regression. An agentic orchestrator enables iterative counterfactual recovery by escalating intervention tiers (behavioral $\to$ anthropometric $\to$ clinical) and relaxing plausibility ellipsoid radii ($1.0\times \to 1.5\times \to 2.0\times$), with binary features constrained to valid state transitions ($z_i + \delta_i \in \{0,1\}$). A verifier agent audits every numeric claim in generated explanations, rejecting hallucinations via up to $M=3$ repair retries.
+
+The framework is evaluated on NHANES 2017--2018 (5,533 adults) for prevalent diabetes prediction using features excluding HbA1c and glucose to avoid circularity. The base logistic regression achieves mean AUC 0.770 (95\% CI: 0.742--0.798) across 20 stratified seeds. Subgroup-conditional conformal calibration with empirical Bayes shrinkage and DKW guardrail yields overall test coverage 91.3\% (target 90\%, 95\% CI: 88.7\%--94.0\%), with subgroup coverage ranging 88.6\%--93.0\%. A 20-seed stability analysis shows EB-MinCov achieves 84.4\% worst-subgroup coverage (vs. 81.1\% for Mondrian, 80.9\% for Standard EB, 82.3\% for Marginal Split and Complete Pooling), with an 11.1\% max coverage gap. Counterfactual optimization on the calibrated model reaches target risk ($\le$50\%) for 100\% of high-risk patients (mean 55 per seed) via iterative tier escalation (Tier 1: 56.1\%, Tier 2: 43.9\%, Tier 3: 0.0\%) and radius relaxation (Tier 1 $1.0\times$: 35.6\%, Tier 1 $1.5\times$: 20.2\%, Tier 2 $1.0\times$: 23.3\%, Tier 2 $1.5\times$: 20.2\%, Tier 1 $2.0\times$: 0.3\%, Tier 2 $2.0\times$: 0.5\%, Tier 3: 0.0\%), with 100\% ellipsoid containment and mean $\|\boldsymbol{\delta}\|_2 = 1.38$ SD units. Wald-test attribution with Benjamini--Hochberg correction (FDR 10\%) identifies Age (100\% of seeds) and Waist circumference (100\%) as consistently significant. A deployable auditor monitors conformal+audit validation coverage and ECE (3.9\%), with all validation subgroup coverages exceeding the 80\% abstention threshold. Multi-model conformal baselines (Marginal, Mondrian, Complete Pooling, Standard EB, EB-MinCov) are benchmarked across 20 seeds. Nonlinear XGBoost and LightGBM achieve calibrated AUCs of 0.785 and 0.788 with 100\% counterfactual reach. LLM Loop 2 verification on 86 high-risk patients (seed 3) achieves 94.2\% final pass for Qwen2.5-1.5B-Instruct (67.4\% $\to$ 91.9\% $\to$ 94.2\%, $M=3$) and 100.0\% for 4-bit Qwen2.5-7B-Instruct (33.7\% $\to$ 87.2\% $\to$ 100.0\%, $M=3$), with fallback rates 5.8\% and 0.0\%. Unlabeled drift detection (MMD, KS, Mahalanobis) is evaluated under progressive covariate corruption. Only NHANES 2017--2018 is available; multi-cycle temporal validation is not performed. All numbers are generated from a single reproducible pipeline with a 4-way data split (50\%/15\%/15\%/20\%) and 20 stratified seeds.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+
+Clinical risk prediction for type 2 diabetes (T2D) typically relies on models that output a single risk score without calibrated uncertainty quantification or actionable explanations. When explanations are provided, they are often post-hoc attributions (SHAP, LIME) that lack statistical guarantees and can be unstable across subgroups.
+
+Conformal prediction \cite{vovk2005algorithmic, shafer2008tutorial, angelopoulos2021gentle} provides distribution-free, finite-sample coverage guarantees. Group-conditional conformal prediction \cite{lei2018distribution, romano2019conformalized, melki2023group} calibrates separately within each subgroup, but small subgroups suffer from high variance. Hierarchical shrinkage \cite{dunn2023distribution} stabilizes quantile estimates by pooling information across groups. Distance-based conformal prediction uses nonconformity scores based on feature-space distances to construct plausibility regions that respect feature covariance.
+
+Counterfactual explanations \cite{wachter2017counterfactual} recommend minimal changes to achieve a desired outcome, but standard methods ignore statistical plausibility and actionability constraints. Attribution methods \cite{lundberg2017unified} identify important features but do not calibrate significance. Large language models (LLMs) can generate fluent narratives but hallucinate numeric claims and violate safety constraints unless grounded in verified evidence \cite{yao2023react, schick2023toolformer}.
+
+We integrate these components into a conformal-grounded agentic framework. Figure~\ref{fig:architecture} illustrates the overall architecture. Our contributions are: (1) group-conditional conformal calibration with empirical Bayes shrinkage and a monotonic coverage guardrail; (2) a tiered QCQP counterfactual solver with binary state-transition constraints and ellipsoidal plausibility; (3) inference-valid Wald-test attribution with Benjamini--Hochberg correction; (4) a deployable dual-mode auditor (labeled + unlabeled drift detection); (5) an agentic orchestrator with iterative counterfactual recovery (Loop 1) and LLM narrative verification/repair (Loop 2) with zero unverified hallucinations. Full mathematical derivations, proofs, and extended analyses are provided in the Supplementary Information (\texttt{supplementary.pdf}).
+
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Study Cohort, Leakage-Free 4-Way Split, and Clinical Feature Embedding}
+\label{sec:embedding}
+
+NHANES 2017--2018 ($N=5{,}533$ adults, 18.6\% diabetes prevalence). Critical design choice: HbA1c and glucose are excluded from features because they are diagnostic criteria for diabetes; including them creates circularity (AUC $>$ 0.95). With anthropometric, demographic, and behavioral features only, AUC is 0.770. Features: Age, BMI, waist circumference, systolic/diastolic BP, income-to-poverty ratio, smoking status, drinking status, physical activity, gender ($d=13$ after encoding).
+
+Given a reference cohort $\mathcal{D}_{\text{ref}}$ (non-diabetic controls), each continuous feature $x_j$ is transformed via the empirical CDF $F_j^{\text{ref}}$ and the Gaussian quantile function $\Phi^{-1}$:
+\begin{equation}
+z_j = \Phi^{-1}\bigl(\operatorname{clip}(F_j^{\text{ref}}(x_j), \epsilon, 1-\epsilon)\bigr).
+\end{equation}
+Categorical features are one-hot encoded with drop-first. The resulting vector $\mathbf{z} \in \mathbb{R}^d$ has coordinates in standard-deviation units relative to the reference population. The 4-way split is 50\%/15\%/15\%/20\% (train/Platt/cal+audit/test), stratified by outcome and subgroup, across 20 seeds (0--19). See Supplementary Note S2 (\ref{supp-sec:cohort}) for the full feature dictionary and split counts.
+
+\subsection{System Architecture Overview}
+\label{sec:architecture}
+
+Figure~\ref{fig:architecture} presents the system architecture as a vector diagram with embedded mathematical formulas.
+
+\begin{figure}[htbp]
+\centering
+\noindent\resizebox{\linewidth}{!}{\begin{tikzpicture}[scale=1, every node/.style={font=\small}]
+% Tier 1
+\node[draw, rounded corners, fill=blue!10, text width=2.8cm, align=center] (data) at (0,8) {Tier 1: Data \& Embedding\\ NHANES $N=5{,}533$\\ $z_j=\Phi^{-1}(F_j^{\text{ref}}(x_j))$};
+% Tier 2
+\node[draw, rounded corners, fill=green!10, text width=2.8cm, align=center] (pred) at (-4,5) {Predictor\\ $p(\mathbf{z})=\sigma(\mathbf{w}^\top\mathbf{z}+b)$};
+\node[draw, rounded corners, fill=green!10, text width=2.8cm, align=center] (conf) at (0,5) {Conformal (EB-MinCov)\\ $\tilde q_g=\frac{q_g+\kappa_g\bar q}{1+\kappa_g}$\\ $\kappa_g=\hat\sigma_g^2/\hat\tau^2$\\ $\hat q_g=\max(\tilde q_g,q_g)$};
+\node[draw, rounded corners, fill=green!10, text width=2.8cm, align=center] (qcqp) at (4,5) {QCQP Counterfactual\\ $\min\|\boldsymbol\delta\|_2$ s.t. $\mathbf{w}^\top\boldsymbol\delta\le c$\\ $\|\Sigma_g^{-1/2}(\mathbf z+\boldsymbol\delta-\boldsymbol\mu_g)\|_2\le\rho r_g$};
+\node[draw, rounded corners, fill=green!10, text width=2.8cm, align=center] (attr) at (-4,2) {Wald Attribution\\ $Z_j=|w_j|/\widehat{\mathrm{SE}}_j$\\ BH FDR 10\%};
+\node[draw, rounded corners, fill=green!10, text width=2.8cm, align=center] (audit) at (4,2) {Dual Auditor\\ $\widehat{\mathrm{Cov}}_g<0.80\lor\mathrm{ECE}>0.25$\\ $\to$ ABSTAIN};
+% Tier 3
+\node[draw, rounded corners, fill=orange!10, text width=2.8cm, align=center] (loop1) at (0,2) {Loop 1: Recovery\\ $t\!:\!1\!\to\!2\!\to\!3$\\ $\rho\!:\!1.0\!\to\!1.5\!\to\!2.0$};
+\node[draw, rounded corners, fill=orange!10, text width=2.8cm, align=center] (loop2) at (0,-1) {Loop 2: LLM Verify\\ $\mathcal V=\{v_1,\dots,v_5\}$\\ Repair $M\le3$};
+% Tier 4
+\node[draw, rounded corners, fill=purple!10, text width=2.8cm, align=center] (out) at (0,-4) {Certified Outputs\\ $C_g(x)$, $\boldsymbol\delta^*$, Sig, Narrative};
+% Arrows
+\draw[->, thick] (data) -- (pred);
+\draw[->, thick] (data) -- (conf);
+\draw[->, thick] (data) -- (qcqp);
+\draw[->, thick] (pred) -- (attr);
+\draw[->, thick] (conf) -- (loop1);
+\draw[->, thick] (qcqp) -- (loop1);
+\draw[->, thick] (loop1) -- (loop2);
+\draw[->, thick] (audit) -- (loop2);
+\draw[->, thick] (loop2) -- (out);
+\end{tikzpicture}}
+\caption{System Architecture: The Conformal-Grounded Agentic Risk Explanation framework. Tiers 1--4: data/embedding, deterministic statistical tools, agentic control loops, certified outputs. Full mathematical details in Supplementary Note S1 (\ref{supp-sec:proofs}).}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{Calibrated Risk Predictor and Subgroup-Conditional Conformal Calibration (EB-MinCov)}
+\label{sec:conformal}
+
+A logistic regression is trained on the train split (50\%) with class-weighted balanced objective. Platt calibration on the 15\% Platt set fits $p = \sigma(A \cdot \text{logit}_{\text{base}} + B)$. Split conformal prediction on the 15\% conformal+audit validation set uses nonconformity score $A = 1-p$ (positive) or $A = p$ (negative). For each subgroup $g$, the $(1-\alpha)$-quantile $q_g$ is computed with $\alpha=0.1$.
+
+Empirical Bayes shrinkage with group-specific weights $\kappa_g = \hat\sigma_g^2/\hat\tau^2$ (within-group variance $\hat\sigma_g^2 = \alpha(1-\alpha)/(n_g \hat f_g(q_g)^2)$ via KDE; between-group variance $\hat\tau^2$ via method of moments):
+\begin{equation}
+\tilde q_g = \frac{q_g + \kappa_g \bar q}{1+\kappa_g}, \qquad \hat q_g = \max(\tilde q_g, q_g).
+\end{equation}
+The guardrail $\hat q_g = \max(\tilde q_g, q_g)$ ensures monotonic coverage (never shrink toward less coverage). Mean $\hat\tau^2 = 0.0065$ across 20 seeds. See Supplementary Note S1 (\ref{supp-sec:proofs}) for full proofs and Supplementary Note S3 (\ref{supp-sec:conformal_ext}) for intersectional analyses.
+
+\begin{theorem}[Shrinkage Bias-Variance Tradeoff]
+The MSE of $\tilde q_g$ is bounded by $\frac{\sigma^2}{(1+\kappa)^2} + \frac{\kappa^2}{(1+\kappa)^2}\tau^2$, minimized at the empirical Bayes $\kappa$. Full proof in Supplementary Note S1 (\ref{supp-sec:proofs}).
+\end{theorem}
+
+\textbf{Algorithm 1 (EB-MinCov Calibration):} Given calibration scores $\{A_i\}_{i=1}^{n_g}$ per subgroup $g$: (1) compute raw quantile $q_g = \text{Quantile}(\{A_i\}, 1-\alpha)$; (2) estimate $\hat\sigma_g^2$ via KDE at $q_g$; (3) estimate $\hat\tau^2$ via method of moments; (4) compute $\kappa_g = \hat\sigma_g^2/\hat\tau^2$; (5) compute $\tilde q_g = (q_g + \kappa_g \bar q)/(1+\kappa_g)$; (6) apply guardrail $\hat q_g = \max(\tilde q_g, q_g)$. Complexity: $O(n \log n)$ per subgroup. Full algorithm in Supplementary Note S1.
+
+\subsection{QCQP Counterfactual Solver (Loop 1)}
+\label{sec:counterfactual}
+
+For calibrated logistic regression $p(\mathbf z)=\sigma(\mathbf w_{\text{cal}}^\top\mathbf z+b_{\text{cal}})$, the constraint $p(\mathbf z+\boldsymbol\delta)\le\tau$ is equivalent to $\mathbf w_{\text{cal}}^\top\boldsymbol\delta \le c$ where $c = \text{logit}(\tau)-(\mathbf w_{\text{cal}}^\top\mathbf z+b_{\text{cal}})$. The problem:
+\begin{equation}
+\begin{aligned}
+\min_{\boldsymbol\delta}\;&\|\boldsymbol\delta\|_2 \\
+\text{s.t.}\;&\mathbf w_{\text{cal}}^\top\boldsymbol\delta\le c,\quad
+(\mathbf z+\boldsymbol\delta-\boldsymbol\mu_g)^\top\Sigma_g^{-1}(\mathbf z+\boldsymbol\delta-\boldsymbol\mu_g)\le r_g^2,\\
+&\delta_i=0\;\forall i\notin\mathcal A_t,\quad z_i+\delta_i\in\{0,1\}\;\forall i\in\mathcal B_t.
+\end{aligned}
+\end{equation}
+$\mathcal A_t$ = actionable features for tier $t$; $\mathcal B_t\subseteq\mathcal A_t$ binary features; $\Sigma_g$ = Ledoit-Wolf covariance; $r_g$ = 90th-percentile Mahalanobis radius. Tier 1: enumerate $2^{|\mathcal B_1|}$ valid state combinations. Tiers 2/3: enumerate binary states, solve continuous part analytically ($\boldsymbol\delta_{\mathcal C_t}^* = -c'\|\mathbf w_{\mathcal C_t}\|^{-2}\mathbf w_{\mathcal C_t}$ if $c'<0$, else $\mathbf 0$), fallback to SLSQP. See Supplementary Note S1 (\ref{supp-sec:proofs}) for the corrected Theorem 4 and Supplementary Note S4 (\ref{supp-sec:cf_ext}) for nonlinear solver details.
+
+\begin{theorem}[Counterfactual Optimality]
+For logistic regression, if the unconstrained solution satisfies the ellipsoid constraint, it is the unique global minimum. For binary features, discrete enumeration over valid state transitions guarantees global optimality over the finite set. Full proof in Supplementary Note S1 (\ref{supp-sec:proofs}).
+\end{theorem}
+
+\textbf{Algorithm 2 (Loop 1 -- Tiered QCQP Recovery):} Input: $\mathbf z, g, \tau, \mathcal A_1\subset\mathcal A_2\subset\mathcal A_3$. (1) $t\gets1, \rho\gets1.0$. (2) While $t\le3$: (a) While $\rho\in\{1.0,1.5,2.0\}$: solve QCQP with $\mathcal A_t, \rho$; if $p_{\text{final}}\le\tau$ and inside ellipsoid, return solution; else $\rho\gets$ next. (b) $t\gets t+1, \rho\gets1.0$. (3) Return best feasible $\boldsymbol\delta$. Complexity: $O(2^{|\mathcal B_t|}\cdot d^3)$ per $(t,\rho)$. Full pseudocode in Supplementary Note S1.
+
+\subsection{Wald-Test Attribution}
+\label{sec:attribution}
+
+The calibrated model is logistic regression: $\text{logit}(p(\mathbf z)) = \mathbf w_{\text{cal}}^\top\mathbf z + b_{\text{cal}}$. For feature $j$, Wald statistic $Z_j = |w_{\text{cal},j}|/\widehat{\mathrm{SE}}(w_{\text{cal},j})$ with sandwich/penalized-weighted Hessian SEs (accounting for L2 regularization, balanced weights, and Platt scaling). Two-sided p-value $2(1-\Phi(|w_j|/\mathrm{SE}_j))$; Benjamini--Hochberg (FDR 10\%) per subgroup. Valid at inference time (no ground-truth labels). See Supplementary Note S1 (\ref{supp-sec:proofs}) for SE derivation and Note S5 (\ref{supp-sec:attr_ext}) for sensitivity analyses.
+
+\subsection{Deployable Auditor (Dual-Mode)}
+\label{sec:auditor}
+
+Labeled mode: subgroup coverage $\widehat{\mathrm{Cov}}_g$ and ECE on conformal+audit validation set. Abstain if $\widehat{\mathrm{Cov}}_g < 0.80$ or $\mathrm{ECE} > 0.25$. Unlabeled mode: Mahalanobis quantile exceedance + MMD + KS under progressive covariate shift. See Supplementary Note S6 (\ref{supp-sec:drift_ext}).
+
+\textbf{Algorithm 3 (Dual-Mode Auditor):} (1) Labeled: compute $\widehat{\mathrm{Cov}}_g, \mathrm{ECE}$; if any $\widehat{\mathrm{Cov}}_g<0.80$ or $\mathrm{ECE}>0.25$, abstain. (2) Unlabeled: compute Mahalanobis exceedance rate, MMD, KS; if any exceeds threshold, abstain. Full details in Supplementary Note S6.
+
+\subsection{Schema-Constrained Synthesis and Verifier Agent (Loop 2)}
+\label{sec:synthesis}
+
+The Synthesis Agent (LLM) receives a structured JSON evidence schema (patient ID, subgroup, calibrated risk, prediction set, conformal coverage, top significant features, counterfactual details, audit status). The LLM (Qwen-2.5-1.5B-Instruct, temperature 0.0) generates a clinician narrative. The Verifier Agent checks: (1) risk within $\pm 1\%$, (2) prediction set and coverage match, (3) counterfactual deltas match and exclude frozen features, (4) subgroup stated, (5) no forbidden terms (HbA1c, medications). On failure, structured error trace fed back for regeneration (up to $M=3$). Template fallback guarantees 0\% unverified hallucinations. See Supplementary Note S7 (\ref{supp-sec:llm_ext}) for complete prompts, regex/AST rules, and traces.
+
+\textbf{Algorithm 4 (Loop 2 -- Synthesis and Verifier Repair):} (1) Generate narrative $N$ from evidence schema. (2) Apply $\mathcal V=\{v_1,\dots,v_5\}$. (3) If all pass, emit $N$. (4) Else, feed error trace $E$ to LLM, regenerate (up to $M=3$). (5) If all fail, use template fallback. Guarantees 0\% unverified numeric hallucination. Full details in Supplementary Note S7.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Base Predictor and Subgroup-Conditional Conformal Calibration}
+\label{sec:results_conformal}
+
+Table~\ref{tab:coverage} shows subgroup and overall coverage on the test set, aggregated across 20 stratified seeds. Overall test coverage 91.3\% (target 90\%, 95\% CI: 88.7\%--94.0\%). Subgroup coverage ranges 88.6\%--93.0\%. Mean $\hat\tau^2=0.0065$. Prediction set sizes: mean 1.31 (69.5\% singletons, 30.5\% doubletons, 0.0\% empty). All validation subgroup coverages exceed 80\% abstention threshold.
+
+\begin{table}[htbp]
+\centering
+\caption{Subgroup-conditional conformal coverage (target 90\%), aggregated across 20 seeds.}
+\label{tab:coverage}
+\begin{tabular}{lcccc}
+\toprule
+Subgroup & $n_{\text{test}}$ (mean) & Test Coverage & Val Coverage & Quantile $q_g$ \\
+\midrule
+Asian & 157 & 88.6\% [84.0, 93.2] & 89.1\% [84.5, 93.7] & 0.790 \\
+Black & 256 & 91.4\% [86.8, 96.0] & 91.4\% [87.2, 95.6] & 0.753 \\
+Mexican American & 152 & 91.1\% [86.5, 95.7] & 91.3\% [87.0, 95.6] & 0.780 \\
+Other & 58 & 89.9\% [83.2, 96.6] & 90.6\% [83.9, 97.3] & 0.711 \\
+Other Hispanic & 99 & 90.1\% [84.3, 95.9] & 91.3\% [85.7, 96.9] & 0.733 \\
+White & 385 & 93.0\% [88.9, 97.1] & 92.5\% [88.4, 96.6] & 0.714 \\
+\midrule
+\textbf{Overall} & \textbf{1107} & \textbf{91.3\%} [88.7, 94.0] & \textbf{91.4\%} [89.5, 93.3] & \textbf{0.735} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Counterfactual Recovery vs. Static and Unconstrained Baselines}
+\label{sec:results_counterfactual}
+
+Across 20 seeds, mean 55 high-risk test patients (calibrated $p>0.5$). QCQP counterfactual optimizer yields 100\% reach target risk $\le$50\%, 100\% ellipsoid containment, mean $\|\boldsymbol\delta\|_2=1.38$ SD. Tier escalation: Tier 1 (behavioral) 56.1\%, Tier 2 (anthropometric) 43.9\%, Tier 3 (clinical) 0.0\%. Radius relaxation: Tier 1 $1.0\times$: 35.6\%, $1.5\times$: 20.2\%, Tier 2 $1.0\times$: 23.3\%, $1.5\times$: 20.2\%, Tier 1 $2.0\times$: 0.3\%, Tier 2 $2.0\times$: 0.5\%, Tier 3: 0.0\%. Mean iterations 1.8 (88.4\% required recovery). Tier 3 (SBP/DBP) never reached in any seed.
+
+\begin{table}[htbp]
+\centering
+\caption{Counterfactual recovery comparison on high-risk patients (mean across 20 seeds).}
+\label{tab:counterfactual_baselines}
+\resizebox{\linewidth}{!}{\begin{tabular}{lccccc}
+\toprule
+Method & Reach Rate & Ellipsoid Containment & Mean $\|\boldsymbol\delta\|_2$ & Recovery \% \\
+\midrule
+Loop 1 (LR) & \textbf{100.0\%} & \textbf{100.0\%} & 1.38 & 88.4\% \\
+Loop 1 (XGBoost) & \textbf{100.0\%} & \textbf{100.0\%} & 1.42 & 86.0\% \\
+Loop 1 (LightGBM) & \textbf{100.0\%} & \textbf{100.0\%} & 1.40 & 87.2\% \\
+Wachter Unconstrained & 96.8\% & 41.2\% & 0.87 & -- \\
+Static Tier 1 ($1.0\times$) & 35.2\% & 35.2\% & 0.52 & 0.0\% \\
+Static Tier 2 ($1.0\times$) & 58.7\% & 58.7\% & 1.12 & 0.0\% \\
+Static Tier 3 ($2.0\times$) & 82.1\% & 74.3\% & 2.15 & 0.0\% \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsection{Feature Attribution Significance and Stability}
+\label{sec:results_attribution}
+
+Wald-test attribution with BH correction (FDR 10\%) on calibrated logistic regression per seed. Age significant in 100\% of seeds (global Wald 9.8--12.3), Waist in 100\% (Wald 2.45--4.50), SBP in 85\%, Moderate Activity in 35\%, DBP in 30\%. No other features pass BH correction. See Supplementary Note S5 (\ref{supp-sec:attr_ext}) for full statistics.
+
+\subsection{Deployment Auditing and Label-Free Drift Stress Testing}
+\label{sec:results_drift}
+
+Unlabeled drift detector (Mahalanobis + MMD + KS) under progressive covariate corruption (+3 SD anthropometric shift). MMD detection AUC: 0.50 (0\%), 0.74 (25\%), 0.91 (50\%), 0.98 (75\%), 0.99 (100\%). Mahalanobis exceedance: 0.00, 0.15, 0.38, 0.71, 0.93. Unlabeled abstain rate: 0.00, 0.09, 0.33, 0.66, 0.94. Labeled audit coverage drop below 10\% abstention threshold only at 75\%+ corruption. See Supplementary Note S6 (\ref{supp-sec:drift_ext}) for full breakdown.
+
+\subsection{LLM Loop 2 Narrative Verification and Repair}
+\label{sec:results_llm}
+
+\begin{table}[htbp]
+\centering
+\caption{LLM Loop-2 evaluation on high-risk patients (seed 3, $p>0.5$). $N=86$ per model.}
+\label{tab:multillm}
+\resizebox{\linewidth}{!}{\begin{tabular}{lcccccccc}
+\toprule
+& \multicolumn{4}{c}{Qwen2.5-1.5B-Instruct} & \multicolumn{4}{c}{Qwen2.5-7B-Instruct (4-bit NF4)} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+Variant & Att.~1 & Final & Fallback & Lat.(s) & Att.~1 & Final & Fallback & Lat.(s) \\
+\midrule
+Unconstrained LLM & 0.0\% & 0.0\% & 100.0\% & 3.3 & 0.0\% & 0.0\% & 100.0\% & 29.3 \\
+Schema Prompted (1-shot) & 69.8\% & \textbf{69.8\%} & 30.2\% & 5.0 & 53.5\% & 53.5\% & 46.5\% & 44.2 \\
+Loop 1 + Schema (no Loop 2) & 67.4\% & \textbf{67.4\%} & 32.6\% & 4.9 & 33.7\% & 33.7\% & 66.3\% & 44.0 \\
+Full Agentic (Loop 1 + Loop 2, M=3) & 67.4\% & 94.2\% & 5.8\% & 4.9 & 33.7\% & \textbf{100.0\%} & 0.0\% & 78.8 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Cumulative repair progression: 1.5B: 67.4 $\to$ 91.9 $\to$ 94.2 (fallback 5.8\%). 7B: 33.7 $\to$ 87.2 $\to$ 100.0 (fallback 0.0\%). The larger model starts from lower one-shot compliance (33.7\% vs 67.4\%) but reaches 100\% after repair. See Supplementary Note S7 (\ref{supp-sec:llm_ext}) for full failure taxonomy, prompts, and traces.
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Principal Findings and Clinical Interpretation}
+The framework provides distribution-free conformal guarantees (91.3\% overall, 84.4\% worst-subgroup), actionable counterfactuals (100\% reach, 100\% containment), inference-valid attributions (Age and Waist consistently significant), and deployable auditing (zero abstentions on validation, drift detection at 25\% corruption). LLM Loop 2 achieves 94.2\% (1.5B) and 100.0\% (7B) final pass with zero unverified hallucinations.
+
+\subsection{Comparison with Related Work}
+Our framework differs from prior work by combining conformal calibration with hierarchical shrinkage, tiered counterfactual recovery with binary state transitions, inference-valid attribution, and LLM verification with deterministic predicates. See Supplementary Note S8 (\ref{supp-sec:repro}) for a comparative positioning table.
+
+\subsection{Limitations}
+Prevalent vs. incident diabetes; feature exclusion reduces AUC (0.770 vs $\approx$0.95); counterfactual feasibility requires radius relaxation; worst-subgroup coverage below 90\% target; single dataset (NHANES 2017--2018); no multi-cycle temporal validation; LLM evaluation on 1 seed; simplified drift detection. See Section~\ref{sec:limitations_full} in Supplementary for full discussion.
+
+\subsection{Conclusion}
+We presented a conformal-grounded agentic explanation framework with all metrics verified via a 20-seed pipeline. Key results: LR AUC 0.770; conformal coverage 91.3\% [88.7\%, 94.0\%]; worst-subgroup 84.4\% [76.2\%, 92.6\%]; counterfactual reach 100\% with 100\% containment; mean $\|\boldsymbol\delta\|_2=1.38$ SD; Wald attribution identifies Age (50\% subgroup significance) and Waist (10.8\%); validation ECE 3.9\%; LLM Loop 2: 94.2\% (1.5B) and 100.0\% (7B) final pass. All from a single reproducible pipeline with 4-way split and 20 seeds.
+
+\section{Limitations}
+\label{sec:limitations_full}
+\begin{itemize}
+\item \textbf{Prevalent vs. incident diabetes}: NHANES provides cross-sectional prevalent diabetes.
+\item \textbf{Feature exclusion}: Removing HbA1c/glucose avoids circularity but reduces AUC (0.770 vs $\approx$0.95).
+\item \textbf{Counterfactual feasibility}: 100\% reach requires radius relaxation up to $2.0\times$. Tier 3 (SBP/DBP) never reached.
+\item \textbf{Subgroup coverage}: Worst-subgroup 84.4\% (95\% CI: 76.2\%--92.6\%), below 90\% target.
+\item \textbf{Attribution power}: Age (100\%), Waist (100\%), SBP (85\%), Moderate Activity (35\%), DBP (30\%).
+\item \textbf{Single dataset}: NHANES 2017--2018 only; no multi-cycle temporal validation.
+\item \textbf{Diabetes definition}: Self-reported physician diagnosis (DIQ010).
+\item \textbf{LLM evaluation}: 1 seed (seed 3), 86 high-risk patients, no 8B model evaluated.
+\item \textbf{Drift detection}: Simplified RBF kernel; permutation testing would strengthen claims.
+\item \textbf{Lab-verified target}: HbA1c/FPG not available in processed cohort.
+\end{itemize}
+
+\section{Supplementary Material Directory}
+\label{sec:supp_dir}
+
+All extended analyses, proofs, and implementation details are in \texttt{supplementary.pdf}, cross-referenced via \texttt{supp-} prefix:
+\begin{itemize}
+\item \textbf{Supplementary Note S1}: Complete mathematical derivations and formal proofs (Theorems 1--4, Proposition 1).
+\item \textbf{Supplementary Note S2}: Cohort construction, feature dictionary, and leakage audit.
+\item \textbf{Supplementary Note S3}: Extended conformal calibration and intersectional analyses.
+\item \textbf{Supplementary Note S4}: Extended counterfactual solver details, nonlinear baselines, and clinical conversions.
+\item \textbf{Supplementary Note S5}: Extended feature attribution and sensitivity analyses.
+\item \textbf{Supplementary Note S6}: Deployment drift auditing and covariate shift protocols.
+\item \textbf{Supplementary Note S7}: Complete LLM Loop 2 specifications, prompts, verifier rules, and trace archive.
+\item \textbf{Supplementary Note S8}: Reproducibility guide, environment manifest, and reporting compliance.
+\end{itemize}
+Cross-references use the supp- prefix (e.g., supp\_sec:proofs, supp\_tab:full\_conformal).
+
+\bibliographystyle{plain}
+\bibliography{../references_final}
+
+\end{document}
