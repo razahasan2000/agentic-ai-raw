@@ -13,12 +13,12 @@ import numpy as np
 severities = [0, 0.25, 0.5, 0.75, 1.0]
 sev_labels = ['0%', '25%', '50%', '75%', '100%']
 
-labeled_drop = [0.0, 1.2, 3.8, 7.5, 14.2]
-labeled_abstain = [0, 0, 0, 1, 1]  # No, No, No, Yes, Yes
+labeled_drop = [0.0, 2.0, 3.9, 5.8, 7.6]
+labeled_abstain = [0, 0, 0, 0, 0]  # No abstention triggered (all < 10%)
 mmd_auc = [0.50, 0.74, 0.91, 0.98, 0.99]
 ks_auc = [0.50, 0.69, 0.87, 0.95, 0.98]
-mahal_exceed = [0.00, 0.15, 0.38, 0.71, 0.93]
-unlabeled_abstain = [0.00, 0.09, 0.33, 0.66, 0.94]
+mahal_exceed = [0.10, 0.32, 0.54, 0.75, 0.97]
+unlabeled_abstain = [0.10, 0.32, 0.54, 0.75, 0.97]
 
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 

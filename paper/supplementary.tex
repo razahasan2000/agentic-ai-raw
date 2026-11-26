@@ -31,6 +31,8 @@
 \newtheorem{lemma}{Lemma}
 \newtheorem{proposition}{Proposition}
 
+\renewcommand{\thetable}{S\arabic{table}}
+
 \title{Supplementary Information:\\
 Conformal-Grounded Agentic Risk Explanation}
 \author{Anonymous Authors}
@@ -140,7 +142,11 @@ The calibrated model is logistic regression: $\text{logit}(p(\mathbf z)) = \math
 
 \subsection{Feature Dictionary}
 
-\begin{longtable}{llll}
+\begin{table}[htbp]
+\centering
+\caption{NHANES 2017--2018 feature dictionary (13 features, drop-first gender encoding).}
+\label{tab:feature_dict}
+\begin{tabular}{llll}
 \toprule
 Feature & NHANES Code & Type & Tier \\
 \midrule
@@ -157,7 +163,8 @@ Current smoker & SMQ020 & Binary & Tier 1 \\
 Current drinker & ALQ101 & Binary & Tier 1 \\
 Former smoker & (derived) & Binary & Tier 1 \\
 \bottomrule
-\end{longtable}
+\end{tabular}
+\end{table}
 
 Continuous features transformed via ECDF relative to non-diabetic controls. Categorical features one-hot encoded with drop-first. Coupled smoking transitions: Current Smoker $1\to 0 \implies$ Former Smoker $0\to 1$. Excluded: HbA1c, glucose (circularity avoidance).
 
@@ -180,15 +187,15 @@ Table~\ref{tab:full_conformal} compares five conformal methods across 20 stratif
 \centering
 \caption{Multi-seed conformal coverage comparison (20 seeds, Mean $\pm$ 95\% CI).}
 \label{tab:full_conformal}
-\resizebox{\linewidth}{!}{\begin{tabular}{lcccc}
+\resizebox{\linewidth}{!}{\begin{tabular}{lccccc}
 \toprule
-Method & Overall Cov. & Worst Subgroup & Max Gap \\
+Method & Overall Cov. & Worst Subgroup & Max Gap & Set Size & Singleton \% \\
 \midrule
-EB-MinCov (Ours) & \textbf{91.3\%} [88.7, 94.0] & \textbf{84.4\%} [76.2, 92.6] & 11.1\% [3.7, 18.5] \\
-Marginal Split & 90.1\% [87.3, 92.8] & 82.3\% [75.1, 89.5] & 12.4\% [4.2, 20.6] \\
-Mondrian (Unshrunk) & 89.4\% [86.6, 92.1] & 81.1\% [73.8, 88.4] & 14.2\% [5.1, 23.3] \\
-Complete Pooling & 90.1\% [87.3, 92.8] & 82.3\% [75.1, 89.5] & 12.4\% [4.2, 20.6] \\
-Standard EB (No Guardrail) & 89.4\% [86.9, 91.8] & 80.9\% [73.5, 88.3] & 13.8\% [5.0, 22.6] \\
+EB-MinCov (Ours) & \textbf{91.3\%} [88.7, 94.0] & \textbf{84.4\%} [76.2, 92.6] & 11.1\% [3.7, 18.5] & 1.31 & 69.5\% \\
+Marginal Split & 90.1\% [87.3, 92.8] & 82.3\% [75.1, 89.5] & 12.4\% [4.2, 20.6] & 1.29 & 71.2\% \\
+Mondrian (Unshrunk) & 89.4\% [86.6, 92.1] & 81.1\% [73.8, 88.4] & 14.2\% [5.1, 23.3] & 1.35 & 65.8\% \\
+Complete Pooling & 90.1\% [87.3, 92.8] & 82.3\% [75.1, 89.5] & 12.4\% [4.2, 20.6] & 1.30 & 70.1\% \\
+Standard EB (No Guardrail) & 89.4\% [86.9, 91.8] & 80.9\% [73.5, 88.3] & 13.8\% [5.0, 22.6] & 1.32 & 68.9\% \\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -264,7 +271,7 @@ Inverse-ECDF mapping on high-risk patients: mean $\Delta$BMI $= -1.8$ kg/m$^2$, 
 
 \subsection{Containment Metrics}
 
-Both metrics reported uniformly: (a) Enforced-Radius Containment (at solver's active $\rho \cdot r_g$) = 100\% for all methods; (b) Strict $1.0\times$ (90th-percentile) Containment = 100\% for Loop 1, 41.2\% for Wachter unconstrained, 35.2\% for Static Tier 1, 58.7\% for Static Tier 2, 74.3\% for Static Tier 3.
+Both metrics reported uniformly: (a) Enforced-Radius Containment (at solver's active $\rho \cdot r_g$) = 100\% for all methods; (b) Strict $1.0\times$ (90th-percentile) Containment = 58.9\% for Loop 1, 41.2\% for Wachter unconstrained, 35.2\% for Static Tier 1, 58.7\% for Static Tier 2, 74.3\% for Static Tier 3.
 
 \section{Supplementary Note S5: Extended Feature Attribution and Sensitivity Analyses}
 \label{sec:attr_ext}
@@ -322,7 +329,7 @@ Moderate Activity & 1.1 & 0.9 & 0.81 & 0.5 \\
 
 \subsection{Drift Detection Mathematical Definitions}
 
-\textbf{Mahalanobis Exceedance:} Rate of test samples with Mahalanobis distance exceeding the 95th percentile of the reference distribution. Raw exceedance $\approx 0.10$ at 0\% shift (baseline); excess exceedance = raw $- 0.10$.
+\textbf{Mahalanobis Exceedance:} Rate of test samples with Mahalanobis distance exceeding the 90th percentile of the reference distribution. Raw exceedance $\approx 0.10$ at 0\% shift (baseline).
 
 {\small \textbf{MMD (RBF kernel):} $MMD^2 = \frac{1}{n(n-1)}\sum_{i\ne j}k(x_i,x_j)+\frac{1}{m(m-1)}\sum_{i\ne j}k(y_i,y_j)-\frac{2}{nm}\sum_{i,j}k(x_i,y_j)$ with median heuristic bandwidth. Permutation test, 1000 permutations.}
 
@@ -338,12 +345,12 @@ Moderate Activity & 1.1 & 0.9 & 0.81 & 0.5 \\
 \toprule
 Severity & 0\% & 25\% & 50\% & 75\% & 100\% \\
 \midrule
-Labeled Audit Cov. Drop & 0.0\% & 1.2\% & 3.8\% & 7.5\% & 14.2\% \\
-Labeled Abstain Trigger & No & No & No & Yes & Yes \\
-MMD Detection AUC & 0.50 & 0.74 & 0.91 & 0.98 & 0.99 \\
-KS Detection AUC & 0.50 & 0.69 & 0.87 & 0.95 & 0.98 \\
+Labeled Audit Cov. Drop & 0.0\% & 2.0\% & 3.9\% & 5.8\% & 7.6\% \\
+Labeled Abstain Trigger & No & No & No & No & No \\
+MMD (raw) & 0.0000 & 0.0014 & 0.0037 & 0.0068 & 0.0108 \\
+KS Statistic & 0.00 & 0.22 & 0.45 & 0.67 & 0.89 \\
 Mahalanobis Exceedance & 0.10 & 0.32 & 0.54 & 0.75 & 0.97 \\
-Unlabeled Abstain Rate & 0.00 & 0.09 & 0.33 & 0.66 & 0.94 \\
+Unlabeled Abstain Rate & 0.10 & 0.32 & 0.54 & 0.75 & 0.97 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -398,7 +405,7 @@ Qwen2.5-1.5B (86 patients, 81 passed, 5 failed): all 5 failures due to missing s
 
 \subsection{VRAM and Latency Profiling}
 
-Qwen2.5-7B (4-bit NF4): Load 35.6 s, peak VRAM 5.74 GB, mean per-call latency 49.1 s, total generation time 281.4 min, 344 calls. Qwen2.5-1.5B (FP16): mean per-call latency 4.5 s, total 26.1 min, 344 calls. Full per-variant latency table in Table 8 of main paper.
+Qwen2.5-7B (4-bit NF4): Load 35.6 s, peak VRAM 5.74 GB, mean per-call latency 49.1 s, total generation time 281.4 min, 344 calls. Qwen2.5-1.5B (FP16): mean per-call latency 4.5 s, total 26.1 min, 344 calls. Full per-variant latency table in Table 3 of main paper.
 
 \subsection{LLM Prompts (Full Verbatim)}
 
@@ -478,7 +485,7 @@ python src/generate_fig5_drift.py
 \item \texttt{coverage}: Overall test coverage 91.3\% [88.7, 94.0], worst subgroup 84.4\% [76.2, 92.6], max gap 11.1\% [3.7, 18.5] $\to$ Main Table 1 (coverage), Supp. Table S1 (conformal baselines).
 \item \texttt{models}: LR AUC 0.770 [0.742, 0.798] $\to$ Main Table 2 (counterfactual baselines).
 \item \texttt{auditor}: Validation ECE 3.9\% [2.1, 5.8] $\to$ Auditor results.
-\item \texttt{counterfactual}: Reach 100\%, containment 100\%, mean $\|\delta\|_2$ 1.38 $\to$ Main Table 2 (baselines).
+\item \texttt{counterfactual}: Reach 100\%, enforced containment 100\%, strict 1.0$\times$ containment 58.9\% (Loop 1), mean $\|\delta\|_2$ 1.38 $\to$ Main Table 2 (baselines).
 \item \texttt{baseline\_conformal}: EB-MinCov, Mondrian, Marginal, Complete Pooling, Standard EB $\to$ Supp. Table S1.
 \item \texttt{llm\_evaluation}: 1.5B traces (86 patients, 4 variants) $\to$ Main Table 3 (LLM).
 \item \texttt{llm\_evaluation\_7b}: 7B traces (86 patients, 4 variants, 4-bit NF4) $\to$ Main Table 3 (LLM).

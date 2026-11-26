@@ -41,9 +41,14 @@ for i, (method, r, c, d) in enumerate(zip(methods, reach, containment, delta_nor
     ax.scatter(d, r, s=size, c=colors[i], marker=markers[i], label=method, 
                edgecolors='black', linewidth=1.5, alpha=0.8, zorder=3)
     
-    # Add method label
-    ax.annotate(method, (d, r), xytext=(5, 5), textcoords='offset points',
-                fontsize=9, fontweight='bold', color=colors[i])
+    # Add method label with staggered offsets for Loop 1 labels
+    if i < 3:
+        offsets = [(5, 8), (5, -12), (5, 20)]
+        ax.annotate(method, (d, r), xytext=offsets[i], textcoords='offset points',
+                    fontsize=9, fontweight='bold', color=colors[i])
+    else:
+        ax.annotate(method, (d, r), xytext=(5, 5), textcoords='offset points',
+                    fontsize=9, fontweight='bold', color=colors[i])
 
 # Add diagonal reference line for perfect containment
 ax.plot([0, 2.5], [0, 100], 'k--', alpha=0.3, label='Perfect containment (y=x)')
@@ -52,7 +57,7 @@ ax.set_xlabel('Mean ||δ||₂ (SD units) / Mean Mahalanobis Distance', fontsize=
 ax.set_ylabel('Counterfactual Reach Rate (%)', fontsize=13)
 ax.set_title('Counterfactual Reach vs. Plausibility Across Methods (20 Seeds)', fontsize=14, fontweight='bold')
 ax.set_xlim(-0.1, 2.5)
-ax.set_ylim(-5, 105)
+ax.set_ylim(-5, 115)
 ax.grid(True, alpha=0.3)
 ax.legend(loc='lower right', fontsize=9, ncol=2)
 
