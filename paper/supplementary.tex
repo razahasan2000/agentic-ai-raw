@@ -144,7 +144,7 @@ The calibrated model is logistic regression: $\text{logit}(p(\mathbf z)) = \math
 
 \begin{table}[htbp]
 \centering
-\caption{NHANES 2017--2018 feature dictionary (13 features, drop-first gender encoding).}
+\caption{NHANES 2017--2018 feature dictionary (12 features, drop-first gender encoding).}
 \label{tab:feature_dict}
 \begin{tabular}{llll}
 \toprule
@@ -191,7 +191,7 @@ Table~\ref{tab:full_conformal} compares five conformal methods across 20 stratif
 \toprule
 Method & Overall Cov. & Worst Subgroup & Max Gap & Set Size & Singleton \% \\
 \midrule
-EB-MinCov (Ours) & \textbf{91.3\%} [88.7, 94.0] & \textbf{84.4\%} [76.2, 92.6] & 11.1\% [3.7, 18.5] & 1.31 & 69.5\% \\
+EB-MinCov (Ours) & \textbf{91.3\%} [88.7, 94.0] & \textbf{84.4\%} [76.2, 92.6] & 11.1\% [3.7, 18.5] & 1.36 & 64.5\% \\
 Marginal Split & 90.1\% [87.3, 92.8] & 82.3\% [75.1, 89.5] & 12.4\% [4.2, 20.6] & 1.29 & 71.2\% \\
 Mondrian (Unshrunk) & 89.4\% [86.6, 92.1] & 81.1\% [73.8, 88.4] & 14.2\% [5.1, 23.3] & 1.35 & 65.8\% \\
 Complete Pooling & 90.1\% [87.3, 92.8] & 82.3\% [75.1, 89.5] & 12.4\% [4.2, 20.6] & 1.30 & 70.1\% \\
@@ -482,11 +482,11 @@ python src/generate_fig5_drift.py
 \subsection{metrics\_verified.json Key-to-Table Index}
 
 \begin{itemize}
-\item \texttt{coverage}: Overall test coverage 91.3\% [88.7, 94.0], worst subgroup 84.4\% [76.2, 92.6], max gap 11.1\% [3.7, 18.5] $\to$ Main Table 1 (coverage), Supp. Table S1 (conformal baselines).
-\item \texttt{models}: LR AUC 0.770 [0.742, 0.798] $\to$ Main Table 2 (counterfactual baselines).
+\item \texttt{coverage}: Overall test coverage 91.3\% [88.7, 94.0], worst subgroup 84.4\% [76.2, 92.6], max gap 11.1\% [3.7, 18.5] $\to$ Main Table 1 (coverage), Supp. Table S2 (conformal baselines).
+\item \texttt{models}: LR AUC 0.770 [0.742, 0.798] $\to$ Main Sec. 2.1 / 3.1 (base predictor).
 \item \texttt{auditor}: Validation ECE 3.9\% [2.1, 5.8] $\to$ Auditor results.
 \item \texttt{counterfactual}: Reach 100\%, enforced containment 100\%, strict 1.0$\times$ containment 58.9\% (Loop 1), mean $\|\delta\|_2$ 1.38 $\to$ Main Table 2 (baselines).
-\item \texttt{baseline\_conformal}: EB-MinCov, Mondrian, Marginal, Complete Pooling, Standard EB $\to$ Supp. Table S1.
+\item \texttt{baseline\_conformal}: EB-MinCov, Mondrian, Marginal, Complete Pooling, Standard EB $\to$ Supp. Table S2.
 \item \texttt{llm\_evaluation}: 1.5B traces (86 patients, 4 variants) $\to$ Main Table 3 (LLM).
 \item \texttt{llm\_evaluation\_7b}: 7B traces (86 patients, 4 variants, 4-bit NF4) $\to$ Main Table 3 (LLM).
 \end{itemize}
