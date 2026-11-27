@@ -18,6 +18,7 @@
 \usepackage{color}
 \usepackage{enumitem}
 \usepackage{xcolor}
+\usepackage{flafter}
 
 \geometry{margin=1in}
 \hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
@@ -124,6 +125,8 @@ The guardrail $\hat q_g = \max(\tilde q_g, q_g)$ ensures monotonic coverage (nev
 The MSE of $\tilde q_g$ is bounded by $\frac{\hat\sigma_g^2}{(1+\kappa_g)^2} + \frac{\kappa_g^2}{(1+\kappa_g)^2}\hat\tau^2$, minimized at the empirical Bayes $\kappa_g = \hat\sigma_g^2/\hat\tau^2$. Full proof in Supplementary Note S1 (\ref{supp-sec:proofs}).
 \end{theorem}
 
+Algorithm~\ref{alg:ebmincov} gives the complete EB-MinCov calibration procedure:
+
 \begin{algorithm}[htbp]
 \caption{EB-MinCov Calibration}
 \label{alg:ebmincov}
@@ -163,6 +166,8 @@ $\mathcal A_t$ = actionable features for tier $t$; $\mathcal B_t\subseteq\mathca
 For logistic regression, if the unconstrained solution satisfies the ellipsoid constraint, it is the unique global minimum. For binary features, discrete enumeration over valid state transitions guarantees global optimality over the finite set. Full proof in Supplementary Note S1 (\ref{supp-sec:proofs}).
 \end{theorem}
 
+Algorithm~\ref{alg:recovery} gives the complete Loop 1 tiered QCQP counterfactual recovery procedure:
+
 \begin{algorithm}[htbp]
 \caption{Loop 1 -- Tiered QCQP Counterfactual Recovery}
 \label{alg:recovery}
@@ -194,6 +199,8 @@ The calibrated model is logistic regression: $\text{logit}(p(\mathbf z)) = \math
 
 Labeled mode: subgroup coverage $\widehat{\mathrm{Cov}}_g$ and ECE on conformal+audit validation set. Abstain if $\widehat{\mathrm{Cov}}_g < 0.80$ or $\mathrm{ECE} > 0.25$. Unlabeled mode: Mahalanobis quantile exceedance + MMD + KS under progressive covariate shift. See Supplementary Note S6 (\ref{supp-sec:drift_ext}).
 
+Algorithm~\ref{alg:auditor} gives the complete dual-mode auditor procedure:
+
 \begin{algorithm}[htbp]
 \caption{Dual-Mode Deployment Auditor}
 \label{alg:auditor}
@@ -220,6 +227,8 @@ Labeled mode: subgroup coverage $\widehat{\mathrm{Cov}}_g$ and ECE on conformal+
 \label{sec:synthesis}
 
 The Synthesis Agent (LLM) receives a structured JSON evidence schema (patient ID, subgroup, calibrated risk, prediction set, conformal coverage, top significant features, counterfactual details, audit status). The LLM (Qwen-2.5-1.5B-Instruct, temperature 0.0) generates a clinician narrative. The Verifier Agent checks: (1) risk within $\pm 1\%$, (2) prediction set and coverage match, (3) counterfactual deltas match and exclude frozen features, (4) subgroup stated, (5) no forbidden terms (HbA1c, medications). On failure, structured error trace fed back for regeneration (up to $M=3$). Template fallback guarantees 0\% unverified hallucinations. See Supplementary Note S7 (\ref{supp-sec:llm_ext}) for complete prompts, regex/AST rules, and traces.
+
+Algorithm~\ref{alg:loop2} gives the complete Loop 2 synthesis and verifier repair procedure:
 
 \begin{algorithm}[htbp]
 \caption{Loop 2 -- Schema-Grounded Synthesis and Verifier Repair}
@@ -267,6 +276,8 @@ White & 385 & 93.0\% [88.9, 97.1] & 92.5\% [88.4, 96.6] & 0.714 \\
 \end{tabular}
 \end{table}
 
+Figure~\ref{fig:conformal_parity} compares overall and worst-subgroup coverage across all five conformal methods over 20 seeds:
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.9\linewidth]{../fig2_conformal_parity.png}
@@ -279,6 +290,8 @@ White & 385 & 93.0\% [88.9, 97.1] & 92.5\% [88.4, 96.6] & 0.714 \\
 \label{sec:results_counterfactual}
 
 Across 20 seeds, mean 55 high-risk test patients (calibrated $p>0.5$). QCQP counterfactual optimizer yields 100\% reach target risk $\le$50\%, 100\% enforced-radius containment (58.9\% strict 1.0$\times$), mean $\|\boldsymbol\delta\|_2=1.38$ SD. Tier escalation: Tier 1 (behavioral) 56.1\%, Tier 2 (anthropometric) 43.9\%, Tier 3 (clinical) 0.0\%. Radius relaxation: Tier 1 $1.0\times$: 35.6\%, $1.5\times$: 20.2\%, Tier 2 $1.0\times$: 23.3\%, $1.5\times$: 20.2\%, Tier 1 $2.0\times$: 0.3\%, Tier 2 $2.0\times$: 0.5\%, Tier 3: 0.0\%. Mean iterations 1.8 (88.4\% required recovery). Tier 3 (SBP/DBP) never reached in any seed.
+
+Table~\ref{tab:counterfactual_baselines} compares Loop 1 against static and unconstrained baselines across all high-risk patients:
 
 \begin{table}[htbp]
 \centering
@@ -299,6 +312,8 @@ Static Tier 3 ($2.0\times$) & 82.1\% & 74.3\% & 74.3\% & 2.15 & 0.0\% \\
 \end{tabular}}
 \end{table}
 
+Figure~\ref{fig:counterfactual_pareto} plots counterfactual reach rate against plausibility (mean $\|\boldsymbol{\delta}\|_2$) across all methods:
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.9\linewidth]{../fig3_counterfactual_pareto.png}
@@ -316,6 +331,8 @@ Wald-test attribution with BH correction (FDR 10\%) and sandwich SEs (accounting
 
 Unlabeled drift detector (Mahalanobis + MMD + KS) under progressive covariate corruption (+3 SD anthropometric shift). Mahalanobis exceedance: 0.10, 0.32, 0.54, 0.75, 0.97. KS statistic: 0.00, 0.22, 0.45, 0.67, 0.89. MMD (raw): 0.0000, 0.0014, 0.0037, 0.0068, 0.0108. Labeled audit coverage drop: 0.0\%, 2.0\%, 3.9\%, 5.8\%, 7.6\%. See Supplementary Note S6 (\ref{supp-sec:drift_ext}) for full breakdown.
 
+Figure~\ref{fig:drift_auditor} plots unlabeled drift detection versus labeled audit across covariate shift severities:
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.9\linewidth]{../fig5_drift_auditor.png}
@@ -325,6 +342,8 @@ Unlabeled drift detector (Mahalanobis + MMD + KS) under progressive covariate co
 
 \subsection{LLM Loop 2 Narrative Verification and Repair}
 \label{sec:results_llm}
+
+Table~\ref{tab:multillm} summarizes Loop-2 evaluation results for Qwen2.5-1.5B-Instruct and Qwen2.5-7B-Instruct (4-bit NF4) across all 86 high-risk patients (seed 3):
 
 \begin{table}[htbp]
 \centering
@@ -346,6 +365,8 @@ Full Agentic (Loop 1 + Loop 2, M=3) & 67.4\% & 94.2\% & 5.8\% & 6.9 & 33.7\% & \
 
 Cumulative repair progression: 1.5B: 67.4 $\to$ 91.9 $\to$ 94.2 (fallback 5.8\%). 7B: 33.7 $\to$ 87.2 $\to$ 100.0 (fallback 0.0\%). The larger model starts from lower one-shot compliance (33.7\% vs 67.4\%) but reaches 100\% after repair. See Supplementary Note S7 (\ref{supp-sec:llm_ext}) for full failure taxonomy, prompts, and traces.
 
+Figure~\ref{fig:llm_repair} shows cumulative pass rates across attempts:
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.9\linewidth]{../fig4_llm_repair.png}
@@ -366,25 +387,25 @@ Clinical risk prediction models often operate as opaque scoring engines whose ou
 
 \subsubsection{P1: Conformal prediction and subgroup-conditional coverage}
 
-Datta et al.~\cite{datta2025conformal} provide a theoretical treatment of conformal prediction under Bayesian predictive inference semantics. Their proof-based work establishes that conformal prediction provides finite-sample marginal coverage under exchangeability but does not provide subgroup-conditional guarantees or empirical Bayes shrinkage. Gibbs et al.~\cite{gibbs2025conformal} extend this work by developing conformal prediction with conditional guarantees, showing how to achieve exact finite-sample conditional coverage. Liu et al.~\cite{liu2026speedcp} propose SpeedCP, a fast kernel-based conditional conformal prediction method using lambda-path and S-path algorithms with low-rank latent embeddings. SpeedCP achieves near-uniform marginal miscoverage control at $\alpha{=}0.1$, roughly 30\% shorter prediction intervals, and roughly $40\times$--$50\times$ faster computation than prior conditional conformal methods across synthetic, molecular graph, and brain tumor MRI benchmarks~\cite{liu2026speedcp}. However, conditional coverage remains approximate/localized rather than exact subgroup-conditional coverage, and neither SpeedCP nor Gibbs et al. addresses empirical Bayes shrinkage, DKW finite-sample guardrails, or monotonic coverage guardrails on clinical tabular data~\cite{datta2025conformal, gibbs2025conformal, liu2026speedcp}.
+Datta et al.~\cite{datta2025conformal} provide a theoretical treatment of conformal prediction under Bayesian predictive inference semantics. Their proof-based work establishes that conformal prediction provides finite-sample marginal coverage under exchangeability but does not provide subgroup-conditional guarantees or empirical Bayes shrinkage. Independently, Gibbs et al.~\cite{gibbs2025conformal} develop conformal prediction with conditional guarantees, showing how to achieve exact finite-sample conditional coverage. Liu et al.~\cite{liu2026speedcp} propose SpeedCP, a fast kernel-based conditional conformal prediction method using lambda-path and S-path algorithms with low-rank latent embeddings. SpeedCP achieves near-uniform marginal miscoverage control at $\alpha{=}0.1$, roughly 30\% shorter prediction intervals, and roughly $40\times$--$50\times$ faster computation than prior conditional conformal methods across synthetic, molecular graph, and brain tumor MRI benchmarks~\cite{liu2026speedcp}. However, conditional coverage remains approximate/localized rather than exact subgroup-conditional coverage, and neither SpeedCP nor Gibbs et al. addresses empirical Bayes shrinkage, DKW finite-sample guardrails, or monotonic coverage guardrails on clinical tabular data~\cite{datta2025conformal, gibbs2025conformal, liu2026speedcp}.
 
 \subsubsection{P2: Counterfactual recourse with plausibility and actionability}
 
-Kelechi and Jiao~\cite{kelechi2023mga} propose Maximum Global Actionability (MGA), a recipient-user actionability metric with algorithms that classify features as actionable/non-actionable/conditionally non-actionable by mutability and cost. Evaluated on five tabular datasets including a Diabetes dataset using XGB and RF models with SHAP and PFI explainers, actionability varies substantially by dataset and model-explainer combination~\cite{kelechi2023mga}. However, MGA is a post-hoc actionability metric, not a constrained recourse solver, and generates no counterfactuals~\cite{kelechi2023mga}. Oh~\cite{oh2026cbfi} proposes localized case-based feature importance (CBFI) decomposing per-instance importance into standalone and interaction effects using a six-label taxonomy, evaluated on real tabular datasets~\cite{oh2026cbfi}. CBFI explains predictions but does not produce actionable recourse actions with plausibility guarantees~\cite{oh2026cbfi}. None of these addresses ellipsoidal/Mahalanobis plausibility regions, QCQP solving, binary state-transition constraints, or tiered escalation~\cite{oh2026cbfi, kelechi2023mga, ustun2019actionable}.
+Nwaike and Jiao~\cite{kelechi2023mga} propose Maximum Global Actionability (MGA), a recipient-user actionability metric with algorithms that classify features as actionable/non-actionable/conditionally non-actionable by mutability and cost. Evaluated on five tabular datasets including a Diabetes dataset using XGB and RF models with SHAP and PFI explainers, actionability varies substantially by dataset and model-explainer combination~\cite{kelechi2023mga}. However, MGA is a post-hoc actionability metric, not a constrained recourse solver, and generates no counterfactuals~\cite{kelechi2023mga}. Oh~\cite{oh2026cbfi} proposes localized case-based feature importance (CBFI) decomposing per-instance importance into standalone and interaction effects using a six-label taxonomy, evaluated on real tabular datasets~\cite{oh2026cbfi}. CBFI explains predictions but does not produce actionable recourse actions with plausibility guarantees~\cite{oh2026cbfi}. Ustun et al.~\cite{ustun2019actionable} formulate actionable recourse in linear classification via mixed-integer linear programming with immutability constraints, but do not enforce Mahalanobis plausibility ellipsoids, tiered escalation, or conformal uncertainty. None of these addresses ellipsoidal/Mahalanobis plausibility regions, QCQP solving, binary state-transition constraints, or tiered escalation~\cite{oh2026cbfi, kelechi2023mga}.
 
 \subsubsection{P3: Inference-valid feature attribution}
 
-Oh~\cite{oh2026cbfi} is the most attribution-relevant record, decomposing per-instance importance into standalone and interaction effects using a six-label taxonomy~\cite{oh2026cbfi}. However, CBFI is case-based/localized and not inference-valid in the frequentist sense (no Wald Z-statistics, no Benjamini--Hochberg FDR control per subgroup)~\cite{oh2026cbfi}. None of the surveyed records uses Wald tests, sandwich standard errors, or Benjamini--Hochberg FDR correction for feature attribution~\cite{datta2025conformal, liu2026speedcp, oh2026cbfi, kelechi2023mga, nauta2023systematic}.
+Oh~\cite{oh2026cbfi} is the most attribution-relevant record, decomposing per-instance importance into standalone and interaction effects using a six-label taxonomy~\cite{oh2026cbfi}. However, CBFI is case-based/localized and not inference-valid in the frequentist sense (no Wald Z-statistics, no Benjamini--Hochberg FDR control per subgroup)~\cite{oh2026cbfi}. Nauta et al.~\cite{nauta2023systematic} systematically review quantitative XAI evaluation metrics across correctness and stability dimensions. None of these approaches uses Wald tests, sandwich standard errors, or Benjamini--Hochberg FDR correction for feature attribution~\cite{datta2025conformal, liu2026speedcp, oh2026cbfi, kelechi2023mga, nauta2023systematic}.
 
 \subsubsection{P4: Deployment auditing, drift detection, and abstention}
 
-No record among the surveyed literature directly addresses deployment auditing, drift detection with Mahalanobis/MMD/KS tests, or abstention thresholds as a primary contribution. Kelechi and Jiao~\cite{kelechi2023mga} evaluate actionability on tabular datasets but do not perform drift detection or abstention~\cite{kelechi2023mga}. This pillar is effectively absent from the evidence base.
+No prior work combines deployment auditing with drift detection using Mahalanobis/MMD/KS tests and abstention thresholds as a primary contribution. Kelechi and Jiao~\cite{kelechi2023mga} evaluate actionability on tabular datasets but do not perform drift detection or abstention~\cite{kelechi2023mga}. Our framework fills this gap with a deployable dual-mode auditor that monitors both labeled validation metrics and unlabeled drift signals, triggering abstention when coverage or calibration guarantees degrade.
 
 \subsubsection{P5: LLM verification and hallucination mitigation}
 
 Yang et al.~\cite{yang2026hcpd} propose HCPD, a zero-source LLM hallucination detection method where an LLM agent decomposes judgment into weighted, interpretable criteria aggregated into a truthfulness score, aligned via GRPO with weak supervision, evaluated on four QA datasets with average AUROC $\approx$88--90~\cite{yang2026hcpd}. However, HCPD is QA-only (not clinical narratives) and uses weak-supervision proxy labels rather than ground truth~\cite{yang2026hcpd}. Ye et al.~\cite{ye2026curaview} propose CuraView, a multi-agent GraphRAG framework for sentence-level hallucination detection in discharge summaries, achieving F1(E4){=}0.831 on MIMIC-IV~\cite{ye2026curaview}. CuraView is clinical but single-center, English-only, and uses generation-stage ground truth (circularity)~\cite{ye2026curaview}. None addresses schema-constrained generation with deterministic verifier predicates, repair loops with bounded iterations, template fallback guaranteeing zero unverified hallucination, or evaluation on clinical narratives with numeric claim verification~\cite{yang2026hcpd, ye2026curaview}.
 
-The surveyed literature addresses individual pillars---marginal conformal coverage~\cite{datta2025conformal, liu2026speedcp}, actionability measurement~\cite{kelechi2023mga}, zero-source hallucination detection~\cite{yang2026hcpd}, and clinical GraphRAG detection~\cite{ye2026curaview}---but no record bridges two or more pillars, and four of the five manuscript contributions lack any direct empirical counterpart in the evidence base~\cite{datta2025conformal, liu2026speedcp, oh2026cbfi, kelechi2023mga, yang2026hcpd, ye2026curaview}. Our framework is the first to unify all five pillars into a single, agentic, end-to-end system with verified end-to-end guarantees. Supplementary Note S8 (\ref{supp-sec:repro}), Table S7 (\ref{supp-tab:positioning}) provides a comparative positioning table across these six dimensions.
+The surveyed literature addresses individual pillars---marginal conformal coverage~\cite{datta2025conformal, liu2026speedcp}, actionability measurement~\cite{kelechi2023mga}, zero-source hallucination detection~\cite{yang2026hcpd}, and clinical GraphRAG detection~\cite{ye2026curaview}---but no prior work bridges two or more pillars, and four of the five manuscript contributions lack any direct counterpart in prior work~\cite{datta2025conformal, liu2026speedcp, oh2026cbfi, kelechi2023mga, yang2026hcpd, ye2026curaview}. Our framework is the first to unify all five pillars into a single, agentic, end-to-end system with verified end-to-end guarantees. Supplementary Note S8 (\ref{supp-sec:repro}), Table S7 (\ref{supp-tab:positioning}) provides a comparative positioning table across these six dimensions.
 
 \subsection{Limitations}
 \label{sec:limitations_full}

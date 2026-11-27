@@ -16,6 +16,7 @@
 \usepackage{color}
 \usepackage{enumitem}
 \usepackage{xcolor}
+\usepackage{flafter}
 \usepackage{verbatim}
 \usepackage{longtable}
 
@@ -118,6 +119,8 @@ Each check $v_i$ is a decidable predicate: (1) regex extraction of risk percenta
 
 The calibrated model is logistic regression: $\text{logit}(p(\mathbf z)) = \mathbf w_{\text{cal}}^\top \mathbf z + b_{\text{cal}}$. The Hessian of the log-likelihood is $\mathbf X^\top \mathbf W \mathbf X$ with $\mathbf W_{ii}=p_i(1-p_i)$, accounting for L2 regularization ($\lambda$), balanced sample weights ($\mathbf W_{\text{bal}}$), and Platt scaling ($A$). Sandwich SEs: $\mathbf H = \mathbf X^\top \mathbf W_{\text{bal}} \mathbf W \mathbf X + \lambda \mathbf I$, $\mathbf G = \mathbf X^\top \mathbf W_{\text{bal}}^2 \mathbf W \mathbf X$, $\widehat{\mathrm{Cov}} = \mathbf H^{-1} \mathbf G \mathbf H^{-1}$, $\widehat{\mathrm{SE}}(w_j) = \sqrt{\widehat{\mathrm{Cov}}_{jj}}$. Two-sided p-value: $2(1-\Phi(|w_j|/\widehat{\mathrm{SE}}_j))$. BH correction at FDR 10\% per subgroup.
 
+Algorithm~\ref{alg:supp_ebmincov} gives the complete EB-MinCov calibration procedure with group-specific shrinkage weights and the monotonic DKW guardrail:
+
 \begin{algorithm}[htbp]
 \caption{Supplementary Algorithm: EB-MinCov Calibration (Expanded)}
 \label{alg:supp_ebmincov}
@@ -141,6 +144,8 @@ The calibrated model is logistic regression: $\text{logit}(p(\mathbf z)) = \math
 \label{sec:cohort}
 
 \subsection{Feature Dictionary}
+
+Table~\ref{tab:feature_dict} lists all 12 features used in the analysis, their NHANES codes, types, and intervention tier assignments:
 
 \begin{table}[htbp]
 \centering
@@ -204,6 +209,8 @@ Standard EB (No Guardrail) & 89.4\% [86.9, 91.8] & 80.9\% [73.5, 88.3] & 13.8\% 
 
 Mean $\tau^2 = 0.0018$ activates hierarchical shrinkage across 12 intersectional strata. Mean worst-stratum coverage improves from 79.2\% (unshrunk) to 84.1\% (shrunken). Quantile monotonicity verification: if $\hat q_g^{(A)} \ge \hat q_g^{(B)}$ across all subgroups, then $\text{SetSize}(A) \ge \text{SetSize}(B)$ and $\text{Cov}(A) \ge \text{Cov}(B)$.
 
+Table~\ref{tab:intersectional} reports coverage for each of the 12 Race $\times$ Sex strata:
+
 \begin{table}[htbp]
 \centering
 \caption{Intersectional Race $\times$ Sex coverage (12 strata, mean across 20 seeds).}
@@ -233,7 +240,7 @@ Other Female & 30 & 91.3\% & 1.8 \\
 
 \subsection{Nonlinear Tree-Ensemble Counterfactual (Supplementary Algorithm S1)}
 
-For XGBoost/LightGBM, Loop 1 uses discrete binary enumeration ($z_i + \delta_i \in \{0,1\}$) with projected gradient/COBYLA optimization inside the Ledoit-Wolf ellipsoid.
+Algorithm~\ref{alg:supp_s1} gives the full procedure for nonlinear tree-ensemble counterfactual optimization using discrete binary enumeration with projected gradient/COBYLA inside the Ledoit-Wolf ellipsoid:
 
 \begin{algorithm}[htbp]
 \caption{Supplementary Algorithm S1: Nonlinear Tree-Ensemble Counterfactual}
@@ -250,6 +257,8 @@ For XGBoost/LightGBM, Loop 1 uses discrete binary enumeration ($z_i + \delta_i \
 \State \Return best $\boldsymbol\delta^*$ or infeasible flag
 \end{algorithmic}
 \end{algorithm}
+
+Algorithm~\ref{alg:supp_s2} gives the complete procedure for fair perturbation-stability evaluation:
 
 \begin{algorithm}[htbp]
 \caption{Supplementary Algorithm S2: Fair Perturbation-Stability Evaluation}
@@ -306,7 +315,7 @@ Gender (Male) & 0.0\% & 0.0\% & 0.54 \\
 
 \subsection{L2 Regularization Sensitivity}
 
-Sensitivity analysis of Wald significance fractions under varying $\lambda \in \{0.01, 0.1, 1.0, 10.0\}$. Age and Waist remain the most significant features across all $\lambda$ values. SBP significance decreases with higher $\lambda$.
+Table~\ref{tab:l2_sensitivity} reports mean Wald statistics for key features across L2 regularization strengths $\lambda \in \{0.01, 0.1, 1.0, 10.0\}$. Age and Waist remain the most significant features across all $\lambda$ values. SBP significance decreases with higher $\lambda$.
 
 \begin{table}[htbp]
 \centering
@@ -336,6 +345,8 @@ Moderate Activity & 1.1 & 0.9 & 0.81 & 0.5 \\
 \textbf{KS Statistic:} Two-sample Kolmogorov-Smirnov test per feature; maximum over features.
 
 \subsection{Full Drift Detection Table}
+
+Table~\ref{tab:full_drift} reports unlabeled drift detection results versus labeled audit under progressive covariate shift (+3 SD anthropometric shift), averaged across 20 seeds:
 
 \begin{table}[htbp]
 \centering
