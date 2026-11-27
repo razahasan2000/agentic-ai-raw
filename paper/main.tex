@@ -371,11 +371,11 @@ Nwaike and Jiao~\cite{kelechi2023mga} propose Maximum Global Actionability (MGA)
 
 \subsubsection{P3: Inference-valid feature attribution}
 
-Oh~\cite{oh2026cbfi} is the most attribution-relevant record, decomposing per-instance importance into standalone and interaction effects using a six-label taxonomy~\cite{oh2026cbfi}. However, CBFI is case-based/localized and not inference-valid in the frequentist sense (no Wald Z-statistics, no Benjamini--Hochberg FDR control per subgroup)~\cite{oh2026cbfi}. Nauta et al.~\cite{nauta2023systematic} systematically review quantitative XAI evaluation metrics across correctness and stability dimensions. None of these approaches uses Wald tests, sandwich standard errors, or Benjamini--Hochberg FDR correction for feature attribution~\cite{datta2025conformal, liu2026speedcp, oh2026cbfi, kelechi2023mga, nauta2023systematic}.
+Among attribution methods, Oh~\cite{oh2026cbfi} focuses on decomposing per-instance importance into standalone and interaction effects using a six-label taxonomy~\cite{oh2026cbfi}. However, CBFI is case-based/localized and not inference-valid in the frequentist sense (no Wald Z-statistics, no Benjamini--Hochberg FDR control per subgroup)~\cite{oh2026cbfi}. Nauta et al.~\cite{nauta2023systematic} systematically review quantitative XAI evaluation metrics across correctness and stability dimensions. None of these approaches uses Wald tests, sandwich standard errors, or Benjamini--Hochberg FDR correction for feature attribution~\cite{datta2025conformal, liu2026speedcp, oh2026cbfi, kelechi2023mga, nauta2023systematic}.
 
 \subsubsection{P4: Deployment auditing, drift detection, and abstention}
 
-No prior work combines deployment auditing with drift detection using Mahalanobis/MMD/KS tests and abstention thresholds as a primary contribution. Kelechi and Jiao~\cite{kelechi2023mga} evaluate actionability on tabular datasets but do not perform drift detection or abstention~\cite{kelechi2023mga}. Our framework fills this gap with a deployable dual-mode auditor that monitors both labeled validation metrics and unlabeled drift signals, triggering abstention when coverage or calibration guarantees degrade.
+No prior work combines deployment auditing with drift detection using Mahalanobis/MMD/KS tests and abstention thresholds as a primary contribution. Nwaike and Jiao~\cite{kelechi2023mga} evaluate actionability on tabular datasets but do not perform drift detection or abstention~\cite{kelechi2023mga}. Our framework fills this gap with a deployable dual-mode auditor that monitors both labeled validation metrics and unlabeled drift signals, triggering abstention when coverage or calibration guarantees degrade.
 
 \subsubsection{P5: LLM verification and hallucination mitigation}
 
