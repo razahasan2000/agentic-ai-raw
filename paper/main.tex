@@ -31,8 +31,8 @@
 \newtheorem{lemma}{Lemma}
 \newtheorem{proposition}{Proposition}
 
-\title{Conformal-Grounded Agentic Risk Explanation:\\
-Subgroup-Calibrated Counterfactual Recovery and Verified Clinical Narratives}
+\title{Certifiable Agentic Risk Explanation:\\
+Subgroup-Calibrated Conformal Guarantees, Plausible Counterfactual Recourse, and Zero-Hallucination Clinical Narratives}
 \author{Anonymous Authors}
 \date{\today}
 
@@ -45,6 +45,8 @@ Clinical risk prediction models often operate as opaque scoring engines whose ou
 
 The framework is evaluated on NHANES 2017--2018 (5,533 adults) for prevalent diabetes prediction using features excluding HbA1c and glucose to avoid circularity. The base logistic regression achieves mean AUC 0.770 (95\% CI: 0.742--0.798) across 20 stratified seeds. Subgroup-conditional conformal calibration with empirical Bayes shrinkage and DKW guardrail yields overall test coverage 91.3\% (target 90\%, 95\% CI: 88.7\%--94.0\%), with subgroup coverage ranging 88.6\%--93.0\%. A 20-seed stability analysis shows EB-MinCov achieves 84.4\% worst-subgroup coverage (vs. 81.1\% for Mondrian, 80.9\% for Standard EB, 82.3\% for Marginal Split and Complete Pooling), with an 11.1\% max coverage gap. Counterfactual optimization on the calibrated model reaches target risk ($\le$50\%) for 100\% of high-risk patients (mean 55 per seed) via iterative tier escalation (Tier 1: 56.1\%, Tier 2: 43.9\%, Tier 3: 0.0\%) and radius relaxation (Tier 1 $1.0\times$: 35.6\%, Tier 1 $1.5\times$: 20.2\%, Tier 2 $1.0\times$: 23.3\%, Tier 2 $1.5\times$: 20.2\%, Tier 1 $2.0\times$: 0.3\%, Tier 2 $2.0\times$: 0.5\%, Tier 3: 0.0\%), with 100\% enforced-radius containment (58.9\% strict 1.0$\times$) and mean $\|\boldsymbol{\delta}\|_2 = 1.38$ SD units. Wald-test attribution with Benjamini--Hochberg correction (FDR 10\%) and sandwich SEs identifies Age as significant in 47.5\% of seeds and Waist circumference in 2.5\%. A deployable auditor monitors conformal+audit validation coverage and ECE (3.9\%), with all validation subgroup coverages exceeding the 80\% abstention threshold. Multi-model conformal baselines (Marginal, Mondrian, Complete Pooling, Standard EB, EB-MinCov) are benchmarked across 20 seeds. Nonlinear XGBoost and LightGBM achieve calibrated AUCs of 0.785 and 0.788 with 100\% counterfactual reach. LLM Loop 2 verification on 86 high-risk patients (seed 3) achieves 94.2\% final pass for Qwen2.5-1.5B-Instruct (67.4\% $\to$ 91.9\% $\to$ 94.2\%, $M=3$) and 100.0\% for 4-bit Qwen2.5-7B-Instruct (33.7\% $\to$ 87.2\% $\to$ 100.0\%, $M=3$), with fallback rates 5.8\% and 0.0\%. Unlabeled drift detection (MMD, KS, Mahalanobis) is evaluated under progressive covariate corruption. Only NHANES 2017--2018 is available; multi-cycle temporal validation is not performed. All numbers are generated from a single reproducible pipeline with a 4-way data split (50\%/15\%/15\%/20\%) and 20 stratified seeds.
 \end{abstract}
+
+\textbf{Keywords:} Conformal prediction; Empirical Bayes shrinkage; Counterfactual recourse; Subgroup fairness; Clinical risk prediction; Large language model verification
 
 \section{Introduction}
 \label{sec:introduction}
@@ -358,7 +360,7 @@ Cumulative repair progression: 1.5B: 67.4 $\to$ 91.9 $\to$ 94.2 (fallback 5.8\%)
 The framework provides distribution-free conformal guarantees (91.3\% overall, 84.4\% worst-subgroup), actionable counterfactuals (100\% reach, 100\% enforced-radius containment, 58.9\% strict 1.0$\times$), inference-valid attributions (Age significant in 47.5\% of seeds with sandwich SEs), and deployable auditing (drift detection via Mahalanobis exceedance, KS, and MMD). LLM Loop 2 achieves 94.2\% (1.5B) and 100.0\% (7B) final pass with zero unverified hallucinations.
 
 \subsection{Comparison with Related Work}
-Our framework differs from prior work by combining conformal calibration with hierarchical shrinkage, tiered counterfactual recovery with binary state transitions, inference-valid attribution, and LLM verification with deterministic predicates. See Supplementary Note S8 (\ref{supp-sec:repro}) for a comparative positioning table.
+Our framework differs from prior work by combining conformal calibration with hierarchical shrinkage, tiered counterfactual recovery with binary state transitions, inference-valid attribution, and LLM verification with deterministic predicates. See Supplementary Note S8 (\ref{supp-sec:repro}), Table S7 (\ref{supp-tab:positioning}) for a comparative positioning table.
 
 \subsection{Limitations}
 \label{sec:limitations_full}

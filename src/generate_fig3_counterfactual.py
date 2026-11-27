@@ -43,9 +43,10 @@ for i, (method, r, c, d) in enumerate(zip(methods, reach, containment, delta_nor
     
     # Add method label with staggered offsets for Loop 1 labels
     if i < 3:
-        offsets = [(5, 8), (5, -12), (5, 20)]
+        offsets = [(-28, 10), (+14, -14), (0, +16)]  # LR, XGBoost, LightGBM
         ax.annotate(method, (d, r), xytext=offsets[i], textcoords='offset points',
-                    fontsize=9, fontweight='bold', color=colors[i])
+                    fontsize=9, fontweight='bold', color=colors[i],
+                    arrowprops=dict(arrowstyle='->', color=colors[i], lw=0.8))
     else:
         ax.annotate(method, (d, r), xytext=(5, 5), textcoords='offset points',
                     fontsize=9, fontweight='bold', color=colors[i])

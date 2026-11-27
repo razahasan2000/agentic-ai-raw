@@ -33,8 +33,8 @@
 
 \renewcommand{\thetable}{S\arabic{table}}
 
-\title{Supplementary Information:\\
-Conformal-Grounded Agentic Risk Explanation}
+\title{Certifiable Agentic Risk Explanation:\\
+Subgroup-Calibrated Conformal Guarantees, Plausible Counterfactual Recourse, and Zero-Hallucination Clinical Narratives: Supplementary Information}
 \author{Anonymous Authors}
 \date{\today}
 
@@ -494,6 +494,27 @@ python src/generate_fig5_drift.py
 \subsection{TRIPOD+AI / CLAIM Reporting Compliance}
 
 Completed methodological reporting checklist: data source (NHANES 2017--2018), eligibility criteria, outcome definition (DIQ010), predictors (no HbA1c/glucose), sample size (5,533), missing data handling, model development (logistic regression, L2), validation (4-way split, 20 seeds), performance metrics (AUC, coverage, ECE), calibration (Platt scaling), fairness (subgroup coverage), interpretability (Wald attribution), uncertainty (conformal prediction sets), clinical utility (counterfactual recovery), limitations (listed in Section~\ref{main-sec:limitations_full} of main paper).
+
+\subsection{Comparative Positioning Table}
+
+\begin{table}[htbp]
+\centering
+\caption{Comparative positioning of the proposed framework against six paradigms across six evaluation dimensions.}
+\label{tab:positioning}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lcccccc}
+\toprule
+Paradigm & Finite-Sample Coverage & Subgroup Stability (EB Guardrail) & Plausible \& Actionable Recourse & Inference-Valid Attribution & Label-Free Drift Auditing & Zero-Hallucination Narrative \\
+\midrule
+Post-hoc Attributions (SHAP / LIME) & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} \\
+Unconstrained Counterfactuals (Wachter et al.) & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{yellow}{$\sim$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} \\
+Standard / Mondrian Split Conformal & \textcolor{green}{$\checkmark$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} \\
+Hierarchical Conformal (Dunn et al.) & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} \\
+Unconstrained Clinical LLMs & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} \\
+\textbf{Ours (Conformal-Grounded Agentic Framework)} & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} \\
+\bottomrule
+\end{tabular}}
+\end{table}
 
 \bibliographystyle{plain}
 \bibliography{../references_final}
