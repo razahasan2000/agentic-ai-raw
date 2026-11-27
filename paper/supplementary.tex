@@ -497,14 +497,17 @@ Completed methodological reporting checklist: data source (NHANES 2017--2018), e
 
 \subsection{Comparative Positioning Table}
 
+Table~\ref{tab:positioning} positions our framework against five prior clinical XAI, counterfactual, and conformal paradigms across six methodological dimensions.
+
 \begin{table}[htbp]
 \centering
-\caption{Comparative positioning of the proposed framework against six paradigms across six evaluation dimensions.}
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\caption{Comparative positioning of the proposed framework against five prior paradigms across six evaluation dimensions.}
 \label{tab:positioning}
-\resizebox{\linewidth}{!}{
-\begin{tabular}{lcccccc}
+\begin{tabular}{p{3.0cm}p{1.7cm}p{1.7cm}p{1.7cm}p{1.7cm}p{1.7cm}p{1.7cm}}
 \toprule
-Paradigm & Finite-Sample Coverage & Subgroup Stability (EB Guardrail) & Plausible \& Actionable Recourse & Inference-Valid Attribution & Label-Free Drift Auditing & Zero-Hallucination Narrative \\
+Paradigm & Cov. (Finite-Sample) & Subgroup Stability (EB) & Plausible Recourse & Attribution & Drift Audit & Zero-Halluc. \\
 \midrule
 Post-hoc Attributions (SHAP / LIME) & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} \\
 Unconstrained Counterfactuals (Wachter et al.) & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{yellow}{$\sim$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} \\
@@ -513,7 +516,7 @@ Hierarchical Conformal (Dunn et al.) & \textcolor{green}{$\checkmark$} & \textco
 Unconstrained Clinical LLMs & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} & \textcolor{red}{$\times$} \\
 \textbf{Ours (Conformal-Grounded Agentic Framework)} & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} & \textcolor{green}{$\checkmark$} \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table}
 
 \bibliographystyle{plain}
