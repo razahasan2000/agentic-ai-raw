@@ -77,35 +77,11 @@ Categorical features are one-hot encoded with drop-first. The resulting vector $
 \subsection{System Architecture Overview}
 \label{sec:architecture}
 
-Figure~\ref{fig:architecture} presents the system architecture as a vector diagram with embedded mathematical formulas.
+Figure~\ref{fig:architecture} presents the system architecture:
 
 \begin{figure}[htbp]
 \centering
-\noindent\resizebox{\linewidth}{!}{\begin{tikzpicture}[scale=1, every node/.style={font=\small}]
-% Tier 1
-\node[draw, rounded corners, fill=blue!10, text width=2.8cm, align=center] (data) at (0,8) {Tier 1: Data \& Embedding\\ NHANES $N=5{,}533$\\ $z_j=\Phi^{-1}(F_j^{\text{ref}}(x_j))$};
-% Tier 2
-\node[draw, rounded corners, fill=green!10, text width=2.8cm, align=center] (pred) at (-4,5) {Predictor\\ $p(\mathbf{z})=\sigma(\mathbf{w}^\top\mathbf{z}+b)$};
-\node[draw, rounded corners, fill=green!10, text width=2.8cm, align=center] (conf) at (0,5) {Conformal (EB-MinCov)\\ $\tilde q_g=\frac{q_g+\kappa_g\bar q}{1+\kappa_g}$\\ $\kappa_g=\hat\sigma_g^2/\hat\tau^2$\\ $\hat q_g=\max(\tilde q_g,q_g)$};
-\node[draw, rounded corners, fill=green!10, text width=2.8cm, align=center] (qcqp) at (4,5) {QCQP Counterfactual\\ $\min\|\boldsymbol\delta\|_2$ s.t. $\mathbf{w}^\top\boldsymbol\delta\le c$\\ $\|\Sigma_g^{-1/2}(\mathbf z+\boldsymbol\delta-\boldsymbol\mu_g)\|_2\le\rho r_g$};
-\node[draw, rounded corners, fill=green!10, text width=2.8cm, align=center] (attr) at (-4,2) {Wald Attribution\\ $Z_j=|w_j|/\widehat{\mathrm{SE}}_j$\\ BH FDR 10\%};
-\node[draw, rounded corners, fill=green!10, text width=2.8cm, align=center] (audit) at (4,2) {Dual Auditor\\ $\widehat{\mathrm{Cov}}_g<0.80\lor\mathrm{ECE}>0.25$\\ $\to$ ABSTAIN};
-% Tier 3
-\node[draw, rounded corners, fill=orange!10, text width=2.8cm, align=center] (loop1) at (0,2) {Loop 1: Recovery\\ $t\!:\!1\!\to\!2\!\to\!3$\\ $\rho\!:\!1.0\!\to\!1.5\!\to\!2.0$};
-\node[draw, rounded corners, fill=orange!10, text width=2.8cm, align=center] (loop2) at (0,-1) {Loop 2: LLM Verify\\ $\mathcal V=\{v_1,\dots,v_5\}$\\ Repair $M\le3$};
-% Tier 4
-\node[draw, rounded corners, fill=purple!10, text width=2.8cm, align=center] (out) at (0,-4) {Certified Outputs\\ $C_g(x)$, $\boldsymbol\delta^*$, Sig, Narrative};
-% Arrows
-\draw[->, thick] (data) -- (pred);
-\draw[->, thick] (data) -- (conf);
-\draw[->, thick] (data) -- (qcqp);
-\draw[->, thick] (pred) -- (attr);
-\draw[->, thick] (conf) -- (loop1);
-\draw[->, thick] (qcqp) -- (loop1);
-\draw[->, thick] (loop1) -- (loop2);
-\draw[->, thick] (audit) -- (loop2);
-\draw[->, thick] (loop2) -- (out);
-\end{tikzpicture}}
+\includegraphics[width=0.9\linewidth]{../fig1_architecture.png}
 \caption{System Architecture: The Conformal-Grounded Agentic Risk Explanation framework. Tiers 1--4: data/embedding, deterministic statistical tools, agentic control loops, certified outputs. Full mathematical details in Supplementary Note S1 (\ref{supp-sec:proofs}).}
 \label{fig:architecture}
 \end{figure}
